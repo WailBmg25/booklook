@@ -1,6 +1,8 @@
-# Implementation Plan
+# Implementation Plan - MVC Architecture
 
-- [x] 1. Set up enhanced backend infrastructure and database models
+## Phase 1: Models Layer (Data Layer) ✅
+
+- [x] 1. Set up enhanced database models and infrastructure
 
   - Extend existing SQLAlchemy models for optimized book storage and user management
   - Create new models for reviews, reading progress, and user favorites
@@ -35,51 +37,43 @@
   - Configure table partitioning for books table to handle >300GB data
   - _Requirements: 6.1, 6.3_
 
-- [x] 2. Implement core backend services and API endpoints
+## Phase 2: Refactor to MVC Pattern
 
-  - Create BookService for handling book queries, search, and content delivery
-  - Build UserService for authentication and user management
-  - Implement ReviewService for review creation and retrieval
-  - Set up FastAPI routes with proper error handling and validation
+- [x] 2. Refactor current services to proper MVC architecture
+
+  - Separate business logic from data access layer
+  - Create proper Model classes with business methods
+  - Implement Repository pattern for data access
+  - Restructure services as business logic controllers
   - _Requirements: 1.1, 1.2, 3.1, 4.1, 6.2_
 
-- [x] 2.1 Create BookService with optimized queries
+- [x] 2.1 Create Repository layer for data access
 
-  - Implement paginated book listing with filtering by genre, author, year
-  - Build full-text search functionality using PostgreSQL's built-in search
-  - Create book content retrieval with pagination for smooth reading
-  - Add book metadata caching with Redis for performance
+  - Implement BookRepository for database operations
+  - Create UserRepository for user data management
+  - Build ReviewRepository for review data operations
+  - Add ReadingProgressRepository for progress tracking
   - _Requirements: 1.1, 1.2, 1.3, 6.1, 6.2_
 
-- [x] 2.2 Implement UserService with authentication
+- [x] 2.2 Enhance Models with business logic methods
 
-  - Create user registration with email validation and password hashing
-  - Build login authentication with session management
-  - Implement user profile management and favorites functionality
+  - Add business methods to Book model (calculate_rating, update_stats)
+  - Implement User model methods (authenticate, manage_favorites)
+  - Create Review model validation and business rules
+  - Add ReadingProgress model calculation methods
   - _Requirements: 4.1, 4.2, 4.4_
 
-- [x] 2.3 Build ReviewService for user reviews
+- [x] 2.3 Refactor Services as Business Logic Controllers
 
-  - Create review submission with rating validation (1-5 stars)
-  - Implement review retrieval and display for books
-  - Add automatic average rating calculation and caching
-  - Prevent duplicate reviews from same user for same book
+  - Convert BookService to business logic controller using repositories
+  - Refactor UserService to handle authentication and user management logic
+  - Update ReviewService to coordinate review business operations
+  - Modify ReadingProgressService for progress management logic
   - _Requirements: 3.1, 3.2, 3.3, 3.5_
 
-- [x] 2.4 Create ReadingProgressService for tracking user progress
+## Phase 3: Controllers Layer (API Layer)
 
-  - Implement reading position tracking with current page storage
-  - Build reading history functionality showing recently read books
-  - Add reading session management for resuming where user left off
-  - _Requirements: 4.3, 2.4_
-
-- [ ] 3. Set up FastAPI routes and middleware
-
-  - Create all API endpoints for books, users, reviews, and reading progress
-  - Implement authentication middleware for protected routes
-  - Add rate limiting and request validation
-  - Set up proper error handling and response formatting
-  - _Requirements: 1.1, 3.1, 4.1, 6.3_
+- [ ] 3. Implement FastAPI Controllers (API endpoints)
 
 - [ ] 3.1 Implement book-related API endpoints
 
@@ -245,8 +239,208 @@
   - _Requirements: 6.1, 6.3_
 
 - [ ] 8.2 Set up content delivery and caching optimization
+
   - Configure content delivery for efficient book text serving
   - Implement CDN integration for static assets
   - Set up advanced caching strategies for improved performance
   - Add compression and optimization for text content delivery
   - _Requirements: 6.1, 6.2_
+  - Create FastAPI controllers that handle HTTP requests and responses
+  - Implement proper request/response models (Pydantic schemas)
+  - Add authentication middleware and request validation
+  - Set up proper error handling and response formatting
+  - _Requirements: 1.1, 3.1, 4.1, 6.3_
+
+- [ ] 3.1 Create Book Controller with API endpoints
+
+  - Implement GET /books with pagination, filtering, and search parameters
+  - Build GET /books/{id} for detailed book information
+  - Create GET /books/{id}/content with page-based content delivery
+  - Add GET /books/{id}/reviews for retrieving book reviews
+  - _Requirements: 1.1, 1.2, 1.4, 3.2_
+
+- [ ] 3.2 Implement User and Authentication Controller
+
+  - Create POST /auth/register for user registration
+  - Build POST /auth/login for user authentication
+  - Implement GET /user/profile and PUT /user/profile for user management
+  - Add favorites endpoints: GET/POST/DELETE /user/favorites/{book_id}
+  - _Requirements: 4.1, 4.2, 4.4_
+
+- [ ] 3.3 Build Review Controller
+
+  - Create POST /books/{id}/reviews for review submission
+  - Implement GET /reviews/{id} for individual review retrieval
+  - Add PUT /reviews/{id} and DELETE /reviews/{id} for review management
+  - Build GET /user/reviews for user's review history
+  - _Requirements: 3.1, 3.5_
+
+- [ ] 3.4 Implement Reading Progress Controller
+
+  - Create GET /user/reading-progress/{book_id} for retrieving user's progress
+  - Build PUT /user/reading-progress/{book_id} for updating reading position
+  - Add GET /user/reading-history for recently read books
+  - Implement GET /user/currently-reading for active reading sessions
+  - _Requirements: 2.4, 4.3_
+
+- [ ] 3.5 Create Pydantic schemas for request/response models
+
+  - Define BookResponse, BookListResponse, BookCreateRequest schemas
+  - Create UserResponse, UserCreateRequest, LoginRequest schemas
+  - Implement ReviewResponse, ReviewCreateRequest schemas
+  - Add ReadingProgressResponse, ProgressUpdateRequest schemas
+  - _Requirements: 1.1, 3.1, 4.1_
+
+## Phase 4: Views Layer (Frontend/Response Formatting)
+
+- [ ] 4. Implement View layer for data presentation
+
+  - Create response formatters and serializers
+  - Implement data transformation for different client needs
+  - Add pagination and filtering response structures
+  - Set up error response formatting
+  - _Requirements: 1.1, 3.1, 4.1, 6.3_
+
+- [ ] 4.1 Create Response Formatters
+
+  - Implement BookFormatter for book data presentation
+  - Create UserFormatter for user profile responses
+  - Build ReviewFormatter for review display
+  - Add ProgressFormatter for reading progress data
+  - _Requirements: 1.1, 1.2, 1.3, 6.1, 6.2_
+
+- [ ] 4.2 Implement Pagination and Filtering Views
+
+  - Create PaginatedResponse wrapper for list endpoints
+  - Implement FilteredResponse for search results
+  - Add SortedResponse for ordered data
+  - Build AggregatedResponse for statistics and summaries
+  - _Requirements: 1.1, 1.2, 6.2_
+
+## Phase 5: Infrastructure and Middleware
+
+- [ ] 5. Set up middleware and infrastructure components
+
+  - Configure Redis for session management and caching
+  - Implement authentication middleware
+  - Add rate limiting and request validation middleware
+  - Set up logging and monitoring middleware
+  - _Requirements: 6.1, 6.2, 6.3_
+
+- [ ] 5.1 Configure caching and session management
+
+  - Set up Redis connection with connection pooling
+  - Implement session middleware for user authentication
+  - Create caching middleware for frequently accessed data
+  - Add cache invalidation strategies
+  - _Requirements: 6.1, 6.2_
+
+- [ ] 5.2 Implement security and validation middleware
+
+  - Create authentication middleware for protected routes
+  - Add request validation middleware
+  - Implement rate limiting middleware
+  - Set up CORS and security headers middleware
+  - _Requirements: 4.1, 6.3_
+
+## Phase 6: Frontend Views (Next.js)
+
+- [ ] 6. Create Next.js frontend application (View Layer)
+
+  - Set up Next.js project with proper MVC structure
+  - Implement view components for book browsing and reading
+  - Create user interface components
+  - Build responsive UI with Tailwind CSS
+  - _Requirements: 1.1, 1.5, 2.1, 4.1_
+
+- [ ] 6.1 Set up Next.js project structure following MVC
+
+  - Initialize Next.js 14 project with TypeScript and Tailwind CSS
+  - Create components (View), pages (Controller), and services (Model interaction)
+  - Set up proper folder structure for MVC separation
+  - Configure NextAuth.js for authentication
+  - _Requirements: 4.1_
+
+- [ ] 6.2 Create View Components for book management
+
+  - Build BookListView component with pagination and filtering
+  - Create BookDetailView for individual book display
+  - Implement BookReaderView for reading interface
+  - Add BookSearchView for search functionality
+  - _Requirements: 1.1, 1.2, 1.3_
+
+- [ ] 6.3 Implement User Interface Views
+
+  - Create LoginView and RegisterView components
+  - Build UserProfileView for profile management
+  - Implement FavoritesView for user's favorite books
+  - Add ReadingHistoryView for progress tracking
+  - _Requirements: 1.5, 3.1, 3.2, 4.2, 4.4_
+
+- [ ] 6.4 Build Reading Interface Views
+
+  - Create BookReaderView with smooth text scrolling
+  - Implement ReadingProgressView for progress tracking
+  - Add ReadingControlsView for font size and theme switching
+  - Build FullScreenReaderView for immersive reading
+  - _Requirements: 2.1, 2.2, 2.4, 2.5_
+
+## Phase 7: Testing and Deployment
+
+- [ ] 7. Implement comprehensive testing for MVC layers
+
+  - Create unit tests for Models, Controllers, and Views
+  - Build integration tests for API endpoints
+  - Implement end-to-end tests for complete workflows
+  - Add performance tests for large dataset handling
+  - _Requirements: 6.1, 6.2, 6.3_
+
+- [ ] 7.1 Test Models and Repositories
+
+  - Write unit tests for Model business logic methods
+  - Test Repository data access operations
+  - Create integration tests for database operations
+  - Add performance tests for query optimization
+  - _Requirements: 6.1, 6.3_
+
+- [ ] 7.2 Test Controllers and API endpoints
+
+  - Create unit tests for Controller business logic
+  - Build integration tests for API endpoints
+  - Test authentication and authorization flows
+  - Add API performance and load tests
+  - _Requirements: 6.1, 6.3_
+
+- [ ] 7.3 Test Views and Frontend Components
+
+  - Create component tests for React Views
+  - Build end-to-end tests for user workflows
+  - Test responsive design and accessibility
+  - Add frontend performance tests
+  - _Requirements: 2.1, 4.1_
+
+## Phase 8: Production Deployment
+
+- [ ] 8. Set up Docker deployment with MVC structure
+
+  - Create Docker containers for each layer
+  - Configure docker-compose for development and production
+  - Set up load balancing and monitoring
+  - Implement backup and disaster recovery
+  - _Requirements: 6.3, 6.4_
+
+- [ ] 8.1 Create Docker containers for MVC layers
+
+  - Build Dockerfile for FastAPI backend (Models + Controllers)
+  - Create Dockerfile for Next.js frontend (Views)
+  - Configure PostgreSQL and Redis containers
+  - Set up reverse proxy and load balancer
+  - _Requirements: 6.3_
+
+- [ ] 8.2 Configure production environment
+
+  - Set up environment-specific configurations
+  - Implement monitoring and logging
+  - Configure backup and disaster recovery
+  - Add performance monitoring and alerting
+  - _Requirements: 6.4_
