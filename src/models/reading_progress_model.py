@@ -128,22 +128,30 @@ class ReadingProgress(Base):
     
     def is_recently_read(self, days: int = 7) -> bool:
         """Check if book was read recently."""
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         
         if not self.last_read_at:
             return False
         
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
-        return self.last_read_at >= cutoff_date
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+        # Make last_read_at timezone-aware if it isn't
+        last_read_at = self.last_read_at
+        if last_read_at.tzinfo is None:
+            last_read_at = last_read_at.replace(tzinfo=timezone.utc)
+        return last_read_at >= cutoff_date
     
     def get_reading_streak_days(self) -> int:
         """Get number of days since last read (for streak calculation)."""
-        from datetime import datetime
+        from datetime import datetime, timezone
         
         if not self.last_read_at:
             return 0
         
-        days_since = (datetime.utcnow() - self.last_read_at).days
+        now = datetime.now(timezone.utc)
+        last_read_at = self.last_read_at
+        if last_read_at.tzinfo is None:
+            last_read_at = last_read_at.replace(tzinfo=timezone.utc)
+        days_since = (now - last_read_at).days
         return max(0, days_since)
     
     def get_reading_velocity(self) -> float:

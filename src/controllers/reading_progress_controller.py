@@ -4,15 +4,16 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from repositories import ReadingProgressRepository, BookRepository
 from models import ReadingProgress
-from helpers import ValidationHelper
+from helpers import ValidationHelper, ResponseHelper
+from controllers.base_controller import BaseController
 from datetime import datetime
 
 
-class ReadingProgressController:
+class ReadingProgressController(BaseController):
     """Controller for reading progress business logic operations."""
     
     def __init__(self, db: Session):
-        self.db = db
+        super().__init__(db)
         self.progress_repo = ReadingProgressRepository(db)
         self.book_repo = BookRepository(db)
     
@@ -27,23 +28,14 @@ class ReadingProgressController:
         # Validate reading progress data
         validation_result = ValidationHelper.validate_reading_progress(current_page, total_pages)
         if not validation_result["is_valid"]:
-            return {"error": "Invalid reading progress data", "issues": validation_result["issues"]}
+            return ResponseHelper.validation_error_response(validation_result)
         
-        # Create or update progress using repository
-        progress = self.progress_repo.create_or_update_progress(
-            user_id=user_id,
-            book_id=book_id,
-            current_page=current_page,
-            total_pages=total_pages
-        )
+        # Create or update progress
+        progress = self.progress_repo.create_or_update_progress(user_id=user_id, book_id=book_id, current_page=current_page, total_pages=total_pages)
         
-        # Get progress with book info
+        # Get and return progress with book info
         progress_data = self.progress_repo.get_progress_with_book_info(user_id, book_id)
-        if not progress_data:
-            return None
-        
-        # Use model business logic for response
-        return progress_data["progress"].to_dict(include_book=True)
+        return progress_data["progress"].to_dict(include_book=True) if progress_data else None
     
     def get_reading_progress(self, user_id: int, book_id: int) -> Optional[Dict[str, Any]]:
         """Get reading progress for a specific user and book."""
@@ -63,39 +55,34 @@ class ReadingProgressController:
         """Get user's recent reading history."""
         progress_records = self.progress_repo.get_user_reading_history(user_id, limit, days_back)
         
-        # Convert using model business logic
-        history = []
-        for progress in progress_records:
-            progress_data = self.progress_repo.get_progress_with_book_info(user_id, progress.book_id)
-            if progress_data:
-                history.append(progress_data["progress"].to_dict(include_book=True))
-        
-        return history
+        # Transform with book info
+        return [
+            progress_data["progress"].to_dict(include_book=True)
+            for progress in progress_records
+            if (progress_data := self.progress_repo.get_progress_with_book_info(user_id, progress.book_id))
+        ]
     
     def get_currently_reading(self, user_id: int, limit: int = 10) -> List[Dict[str, Any]]:
         """Get books the user is currently reading."""
         progress_records = self.progress_repo.get_currently_reading(user_id, limit)
         
-        # Convert using model business logic
-        currently_reading = []
-        for progress in progress_records:
-            progress_data = self.progress_repo.get_progress_with_book_info(user_id, progress.book_id)
-            if progress_data:
-                currently_reading.append(progress_data["progress"].to_dict(include_book=True))
-        
-        return currently_reading
+        # Transform with book info
+        return [
+            progress_data["progress"].to_dict(include_book=True)
+            for progress in progress_records
+            if (progress_data := self.progress_repo.get_progress_with_book_info(user_id, progress.book_id))
+        ]
     
     def get_finished_books(self, user_id: int, limit: int = 20) -> List[Dict[str, Any]]:
         """Get books the user has finished reading."""
         progress_records = self.progress_repo.get_finished_books(user_id, limit)
         
-        # Convert using model business logic
+        # Transform with book info and add finished_at
         finished_books = []
         for progress in progress_records:
-            progress_data = self.progress_repo.get_progress_with_book_info(user_id, progress.book_id)
-            if progress_data:
+            if progress_data := self.progress_repo.get_progress_with_book_info(user_id, progress.book_id):
                 finished_item = progress_data["progress"].to_dict(include_book=True)
-                finished_item["finished_at"] = progress.last_read_at  # When they reached 100%
+                finished_item["finished_at"] = progress.last_read_at
                 finished_books.append(finished_item)
         
         return finished_books

@@ -4,17 +4,17 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from repositories import ReviewRepository, BookRepository
 from models import Review
-from helpers import CacheHelper, ValidationHelper
+from helpers import ValidationHelper, ResponseHelper
+from controllers.base_controller import BaseController
 
 
-class ReviewController:
+class ReviewController(BaseController):
     """Controller for review business logic operations."""
     
     def __init__(self, db: Session):
-        self.db = db
+        super().__init__(db)
         self.review_repo = ReviewRepository(db)
         self.book_repo = BookRepository(db)
-        self.cache_helper = CacheHelper()
     
     def create_review(
         self,
@@ -28,7 +28,7 @@ class ReviewController:
         # Validate review data
         validation_result = ValidationHelper.validate_review_data(rating, title, content)
         if not validation_result["is_valid"]:
-            return {"error": "Invalid review data", "issues": validation_result["issues"]}
+            return ResponseHelper.validation_error_response(validation_result)
         
         # Sanitize input
         title = ValidationHelper.sanitize_string(title, 200)
@@ -36,34 +36,20 @@ class ReviewController:
         
         # Check if user already reviewed this book
         if self.review_repo.user_has_reviewed_book(user_id, book_id):
-            return {"error": "User has already reviewed this book"}
+            return ResponseHelper.error_response("User has already reviewed this book", code="DUPLICATE_REVIEW")
         
-        # Create review using repository
-        review = self.review_repo.create_review(
-            user_id=user_id,
-            book_id=book_id,
-            rating=rating,
-            title=title,
-            content=content
-        )
-        
-        # Update legacy fields using model business logic
+        # Create review
+        review = self.review_repo.create_review(user_id=user_id, book_id=book_id, rating=rating, title=title, content=content)
         review.update_legacy_fields()
         self.db.commit()
         
-        # Update book's rating statistics
+        # Update book stats and invalidate caches
         self._update_book_rating_stats(book_id)
-        
-        # Invalidate caches
         self._invalidate_review_caches(book_id)
         
-        # Get review with related data
+        # Get and return review with related data
         review_data = self.review_repo.get_review_with_user_and_book(review.id)
-        if not review_data:
-            return None
-        
-        # Use model business logic for response
-        return review_data["review"].to_dict(include_user=True, include_book=True)
+        return review_data["review"].to_dict(include_user=True, include_book=True) if review_data else None
     
     def update_review(
         self,
@@ -76,44 +62,28 @@ class ReviewController:
         """Update an existing review with business logic validation."""
         # Validate review data if provided
         if rating is not None or title is not None or content is not None:
-            validation_result = ValidationHelper.validate_review_data(
-                rating or 5, title, content  # Use 5 as default for validation if rating not provided
-            )
+            validation_result = ValidationHelper.validate_review_data(rating or 5, title, content)
             if not validation_result["is_valid"]:
-                return {"error": "Invalid review data", "issues": validation_result["issues"]}
+                return ResponseHelper.validation_error_response(validation_result)
         
         # Sanitize input
         title = ValidationHelper.sanitize_string(title, 200) if title is not None else None
         content = ValidationHelper.sanitize_string(content, 5000) if content is not None else None
         
-        # Update review using repository
-        review = self.review_repo.update_review(
-            review_id=review_id,
-            user_id=user_id,
-            rating=rating,
-            title=title,
-            content=content
-        )
-        
+        # Update review
+        review = self.review_repo.update_review(review_id=review_id, user_id=user_id, rating=rating, title=title, content=content)
         if not review:
             return None
         
-        # Update legacy fields using model business logic
+        # Update legacy fields, commit, and invalidate caches
         review.update_legacy_fields()
         self.db.commit()
-        
-        # Update book's rating statistics
         self._update_book_rating_stats(review.book_id)
-        
-        # Invalidate caches
         self._invalidate_review_caches(review.book_id)
         
-        # Get review with related data
+        # Get and return review with related data
         review_data = self.review_repo.get_review_with_user_and_book(review.id)
-        if not review_data:
-            return None
-        
-        return review_data["review"].to_dict(include_user=True, include_book=True)
+        return review_data["review"].to_dict(include_user=True, include_book=True) if review_data else None
     
     def delete_review(self, review_id: int, user_id: int) -> bool:
         """Delete a review with business logic."""
@@ -155,46 +125,30 @@ class ReviewController:
     ) -> Dict[str, Any]:
         """Get reviews for a book with pagination."""
         # Validate parameters
-        pagination_validation = ValidationHelper.validate_pagination(page, page_size)
-        if not pagination_validation["is_valid"]:
-            return {"error": "Invalid pagination parameters", "issues": pagination_validation["issues"]}
+        pagination_result = self.validate_pagination(page, page_size)
+        if pagination_result["error"]:
+            return pagination_result["response"]
         
-        sort_validation = ValidationHelper.validate_sort_params(
-            sort_by, sort_order, ["created_at", "rating", "updated_at"]
-        )
-        if not sort_validation["is_valid"]:
-            return {"error": "Invalid sort parameters", "issues": sort_validation["issues"]}
+        sort_result = self.validate_sort(sort_by, sort_order, ["created_at", "rating", "updated_at"])
+        if sort_result["error"]:
+            return sort_result["response"]
         
-        # Use validated parameters
-        page = pagination_validation["page"]
-        page_size = pagination_validation["page_size"]
-        sort_by = sort_validation["sort_by"]
-        sort_order = sort_validation["sort_order"]
+        # Get reviews
+        page, page_size = pagination_result["page"], pagination_result["page_size"]
+        sort_by, sort_order = sort_result["sort_by"], sort_result["sort_order"]
         
-        result = self.review_repo.get_book_reviews(
-            book_id=book_id,
-            page=page,
-            page_size=page_size,
-            sort_by=sort_by,
-            sort_order=sort_order
-        )
+        result = self.review_repo.get_book_reviews(book_id=book_id, page=page, page_size=page_size, sort_by=sort_by, sort_order=sort_order)
         
-        # Convert reviews using model business logic
-        reviews_list = []
-        for review in result["items"]:
+        # Transform reviews with related data
+        def transform_review(review):
             review_data = self.review_repo.get_review_with_user_and_book(review.id)
-            if review_data:
-                reviews_list.append(review_data["review"].to_dict(include_user=True))
+            return review_data["review"].to_dict(include_user=True) if review_data else None
         
-        return {
-            "reviews": reviews_list,
-            "total_count": result["total_count"],
-            "total_pages": result["total_pages"],
-            "current_page": result["current_page"],
-            "page_size": result["page_size"],
-            "has_next": result["has_next"],
-            "has_previous": result["has_previous"]
-        }
+        reviews_list = [r for r in [transform_review(review) for review in result["items"]] if r is not None]
+        result["reviews"] = reviews_list
+        result.pop("items")
+        
+        return result
     
     def get_user_reviews(
         self,
@@ -204,35 +158,23 @@ class ReviewController:
     ) -> Dict[str, Any]:
         """Get reviews by a user with pagination."""
         # Validate pagination
-        pagination_validation = ValidationHelper.validate_pagination(page, page_size)
-        if not pagination_validation["is_valid"]:
-            return {"error": "Invalid pagination parameters", "issues": pagination_validation["issues"]}
+        pagination_result = self.validate_pagination(page, page_size)
+        if pagination_result["error"]:
+            return pagination_result["response"]
         
-        page = pagination_validation["page"]
-        page_size = pagination_validation["page_size"]
+        page, page_size = pagination_result["page"], pagination_result["page_size"]
+        result = self.review_repo.get_user_reviews(user_id=user_id, page=page, page_size=page_size)
         
-        result = self.review_repo.get_user_reviews(
-            user_id=user_id,
-            page=page,
-            page_size=page_size
-        )
-        
-        # Convert reviews using model business logic
-        reviews_list = []
-        for review in result["items"]:
+        # Transform reviews with related data
+        def transform_review(review):
             review_data = self.review_repo.get_review_with_user_and_book(review.id)
-            if review_data:
-                reviews_list.append(review_data["review"].to_dict(include_book=True))
+            return review_data["review"].to_dict(include_book=True) if review_data else None
         
-        return {
-            "reviews": reviews_list,
-            "total_count": result["total_count"],
-            "total_pages": result["total_pages"],
-            "current_page": result["current_page"],
-            "page_size": result["page_size"],
-            "has_next": result["has_next"],
-            "has_previous": result["has_previous"]
-        }
+        reviews_list = [r for r in [transform_review(review) for review in result["items"]] if r is not None]
+        result["reviews"] = reviews_list
+        result.pop("items")
+        
+        return result
     
     def get_user_review_for_book(self, user_id: int, book_id: int) -> Optional[Dict[str, Any]]:
         """Get user's review for a specific book."""
@@ -246,19 +188,11 @@ class ReviewController:
     def get_rating_distribution(self, book_id: int) -> Dict[int, int]:
         """Get rating distribution for a book with caching."""
         cache_key = self.cache_helper.generate_cache_key("rating_dist", book_id=book_id)
-        
-        # Try cache first
-        cached_data = self.cache_helper.get(cache_key)
-        if cached_data:
-            return cached_data
-        
-        # Get from repository
-        distribution = self.review_repo.get_rating_distribution(book_id)
-        
-        # Cache the result
-        self.cache_helper.set(cache_key, distribution, ttl=1800)  # 30 minutes
-        
-        return distribution
+        return self.get_cached_or_fetch(
+            cache_key,
+            lambda: self.review_repo.get_rating_distribution(book_id),
+            ttl=1800
+        )
     
     def get_book_review_summary(self, book_id: int) -> Dict[str, Any]:
         """Get comprehensive review summary for a book."""

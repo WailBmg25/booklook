@@ -53,7 +53,7 @@ class BookRepository(BaseRepository[Book]):
         """Find books by genre names using array overlap."""
         return (
             self.db.query(Book)
-            .filter(Book.genre_names.overlap(genre_names))
+            .filter(Book.genre_names.op('&&')(genre_names))
             .order_by(desc(Book.average_rating))
             .limit(limit)
             .all()
@@ -63,7 +63,7 @@ class BookRepository(BaseRepository[Book]):
         """Find books by author names using array overlap."""
         return (
             self.db.query(Book)
-            .filter(Book.author_names.overlap(author_names))
+            .filter(Book.author_names.op('&&')(author_names))
             .order_by(desc(Book.average_rating))
             .limit(limit)
             .all()
@@ -136,15 +136,15 @@ class BookRepository(BaseRepository[Book]):
         if search_text:
             search_vector = func.to_tsvector('english', Book.titre + ' ' + func.coalesce(Book.description, ''))
             search_query = func.plainto_tsquery('english', search_text)
-            query = query.filter(search_vector.match(search_query))
+            query = query.filter(search_vector.op('@@')(search_query))
         
         # Apply genre filter
         if genre_filter:
-            query = query.filter(Book.genre_names.overlap(genre_filter))
+            query = query.filter(Book.genre_names.op('&&')(genre_filter))
         
         # Apply author filter
         if author_filter:
-            query = query.filter(Book.author_names.overlap(author_filter))
+            query = query.filter(Book.author_names.op('&&')(author_filter))
         
         # Apply year filters
         if year_from:

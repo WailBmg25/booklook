@@ -94,8 +94,13 @@ class Review(Base):
         if not self.created_at:
             return False
         
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
-        return self.created_at >= cutoff_date
+        from datetime import timezone
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+        # Make created_at timezone-aware if it isn't
+        created_at = self.created_at
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        return created_at >= cutoff_date
     
     def get_sentiment(self) -> str:
         """Get review sentiment based on rating."""

@@ -22,7 +22,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 # Import database and models
 from database import Base
-import models.book  # This will register all models with Base
+from models import book_model, author_model, genre_model, user_model, review_model, reading_progress_model, associations
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

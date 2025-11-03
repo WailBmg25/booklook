@@ -1,0 +1,706 @@
+{
+	"info": {
+		"name": "BookLook API",
+		"description": "Complete API collection for BookLook - Enhanced Book Library Application",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "book_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "review_id",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('user_id', jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"Test1234\",\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/register",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "register"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('auth_token', jsonData.token);",
+									"    pm.collectionVariables.set('user_id', jsonData.user.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"Test1234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Logout User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/auth/logout",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "logout"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "User Profile",
+			"item": [
+				{
+					"name": "Get User Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/profile",
+							"host": ["{{base_url}}"],
+							"path": ["user", "profile"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Smith\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/user/profile",
+							"host": ["{{base_url}}"],
+							"path": ["user", "profile"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Books",
+			"item": [
+				{
+					"name": "Get All Books",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.books && jsonData.books.length > 0) {",
+									"        pm.collectionVariables.set('book_id', jsonData.books[0].id);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books?page=1&page_size=20",
+							"host": ["{{base_url}}"],
+							"path": ["books"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Books",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books?search=python&page=1&page_size=10",
+							"host": ["{{base_url}}"],
+							"path": ["books"],
+							"query": [
+								{
+									"key": "search",
+									"value": "python"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Filter Books by Genre",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books?genre_filter=Fiction&page=1",
+							"host": ["{{base_url}}"],
+							"path": ["books"],
+							"query": [
+								{
+									"key": "genre_filter",
+									"value": "Fiction"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Book Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/{{book_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["books", "{{book_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Book Content",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/{{book_id}}/content?page=1&words_per_page=300",
+							"host": ["{{base_url}}"],
+							"path": ["books", "{{book_id}}", "content"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "words_per_page",
+									"value": "300"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Book Reviews",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/{{book_id}}/reviews?page=1&page_size=10",
+							"host": ["{{base_url}}"],
+							"path": ["books", "{{book_id}}", "reviews"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Favorites",
+			"item": [
+				{
+					"name": "Get User Favorites",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/favorites?page=1&page_size=20",
+							"host": ["{{base_url}}"],
+							"path": ["user", "favorites"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "20"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Add Book to Favorites",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/favorites/{{book_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["user", "favorites", "{{book_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Check Favorite Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/favorites/{{book_id}}/check",
+							"host": ["{{base_url}}"],
+							"path": ["user", "favorites", "{{book_id}}", "check"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Book from Favorites",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/favorites/{{book_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["user", "favorites", "{{book_id}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Reviews",
+			"item": [
+				{
+					"name": "Create Review",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('review_id', jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"rating\": 5,\n  \"title\": \"Excellent book!\",\n  \"content\": \"This book was amazing. Highly recommended for anyone interested in the topic.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/reviews/books/{{book_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["reviews", "books", "{{book_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Review",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/reviews/{{review_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["reviews", "{{review_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Review",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"rating\": 4,\n  \"title\": \"Great book!\",\n  \"content\": \"Updated review: Still a great book, but I found some minor issues.\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/reviews/{{review_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["reviews", "{{review_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Reviews",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/reviews/user/my-reviews?page=1&page_size=10",
+							"host": ["{{base_url}}"],
+							"path": ["reviews", "user", "my-reviews"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Review for Book",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/reviews/books/{{book_id}}/user-review",
+							"host": ["{{base_url}}"],
+							"path": ["reviews", "books", "{{book_id}}", "user-review"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Review",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/reviews/{{review_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["reviews", "{{review_id}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Reading Progress",
+			"item": [
+				{
+					"name": "Update Reading Progress",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"current_page\": 50,\n  \"total_pages\": 300\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/user/reading-progress/{{book_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["user", "reading-progress", "{{book_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Reading Progress",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/reading-progress/{{book_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["user", "reading-progress", "{{book_id}}"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Reading Session",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/reading-progress/{{book_id}}/session",
+							"host": ["{{base_url}}"],
+							"path": ["user", "reading-progress", "{{book_id}}", "session"]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Reading History",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/reading-progress-history?limit=20&days_back=30",
+							"host": ["{{base_url}}"],
+							"path": ["user", "reading-progress-history"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "days_back",
+									"value": "30"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Currently Reading",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/reading-progress-currently-reading?limit=10",
+							"host": ["{{base_url}}"],
+							"path": ["user", "reading-progress-currently-reading"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Reading Progress",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/reading-progress/{{book_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["user", "reading-progress", "{{book_id}}"]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

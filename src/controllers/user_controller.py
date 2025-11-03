@@ -4,20 +4,18 @@ from typing import Optional, Dict, List, Any
 from sqlalchemy.orm import Session
 from repositories import UserRepository
 from models import User
-from helpers import AuthHelper, ValidationHelper
+from helpers import AuthHelper, ValidationHelper, ResponseHelper
+from controllers.base_controller import BaseController
 from datetime import datetime, timedelta
 
 
-class UserController:
+class UserController(BaseController):
     """Controller for user business logic operations."""
     
     def __init__(self, db: Session):
-        self.db = db
+        super().__init__(db)
         self.user_repo = UserRepository(db)
         self.auth_helper = AuthHelper()
-    
-
-    
     def register_user(
         self,
         email: str,
@@ -28,12 +26,12 @@ class UserController:
         """Register a new user with business logic validation."""
         # Validate email format
         if not self.auth_helper.validate_email_format(email):
-            return {"error": "Invalid email format"}
+            return ResponseHelper.error_response("Invalid email format", code="INVALID_EMAIL")
         
         # Validate password strength
         password_validation = self.auth_helper.validate_password_strength(password)
         if not password_validation["is_valid"]:
-            return {"error": "Weak password", "issues": password_validation["issues"]}
+            return ResponseHelper.error_response("Weak password", password_validation["issues"], "WEAK_PASSWORD")
         
         # Sanitize input
         email = ValidationHelper.sanitize_string(email, 255)
@@ -41,16 +39,14 @@ class UserController:
         last_name = ValidationHelper.sanitize_string(last_name, 100)
         
         if not email or not first_name or not last_name:
-            return {"error": "Invalid input data"}
+            return ResponseHelper.error_response("Invalid input data", code="INVALID_INPUT")
         
         # Check if user already exists
         if self.user_repo.email_exists(email):
-            return {"error": "Email already exists"}
+            return ResponseHelper.error_response("Email already exists", code="EMAIL_EXISTS")
         
-        # Hash password
+        # Hash password and create user
         password_hash = self.auth_helper.hash_password(password)
-        
-        # Create user using repository
         user = self.user_repo.create_user(
             email=email,
             password_hash=password_hash,
@@ -58,11 +54,10 @@ class UserController:
             last_name=last_name
         )
         
-        # Update legacy fields using model business logic
+        # Update legacy fields and commit
         user.update_legacy_fields()
         self.db.commit()
         
-        # Return user data using model's business logic
         return user.to_dict(include_sensitive=True)
     
     def authenticate_user(self, email: str, password: str) -> Optional[Dict[str, Any]]:
@@ -70,12 +65,12 @@ class UserController:
         # Validate and sanitize email
         email = ValidationHelper.sanitize_string(email, 255)
         if not email or not self.auth_helper.validate_email_format(email):
-            return {"error": "Invalid email format"}
+            return ResponseHelper.error_response("Invalid email format", code="INVALID_EMAIL")
         
         user = self.user_repo.find_active_by_email(email)
         
         if not user or not self.auth_helper.verify_password(password, user.password_hash):
-            return {"error": "Invalid credentials"}
+            return ResponseHelper.error_response("Invalid credentials", code="AUTH_FAILED")
         
         # Generate session token
         token = self.auth_helper.generate_session_token()
@@ -151,27 +146,15 @@ class UserController:
     def get_user_favorites(self, user_id: int, page: int = 1, page_size: int = 20) -> Dict[str, Any]:
         """Get user's favorite books with pagination."""
         # Validate pagination
-        pagination_validation = ValidationHelper.validate_pagination(page, page_size)
-        if not pagination_validation["is_valid"]:
-            return {"error": "Invalid pagination parameters", "issues": pagination_validation["issues"]}
+        pagination_result = self.validate_pagination(page, page_size)
+        if pagination_result["error"]:
+            return pagination_result["response"]
         
-        page = pagination_validation["page"]
-        page_size = pagination_validation["page_size"]
-        
+        page, page_size = pagination_result["page"], pagination_result["page_size"]
         result = self.user_repo.get_user_favorites_paginated(user_id, page, page_size)
         
-        # Convert books using model business logic
-        books_list = [book.to_dict() for book in result["items"]]
-        
-        return {
-            "books": books_list,
-            "total_count": result["total_count"],
-            "total_pages": result["total_pages"],
-            "current_page": result["current_page"],
-            "page_size": result["page_size"],
-            "has_next": result["has_next"],
-            "has_previous": result["has_previous"]
-        }
+        # Format response using base controller helper
+        return self.format_paginated_response(result, lambda book: book.to_dict())
     
     def is_book_favorited(self, user_id: int, book_id: int) -> bool:
         """Check if book is in user's favorites."""
@@ -182,15 +165,15 @@ class UserController:
         # Validate new password strength
         password_validation = self.auth_helper.validate_password_strength(new_password)
         if not password_validation["is_valid"]:
-            return {"success": False, "error": "Weak password", "issues": password_validation["issues"]}
+            return ResponseHelper.error_response("Weak password", password_validation["issues"], "WEAK_PASSWORD")
         
         user = self.user_repo.get_by_id(user_id)
         if not user:
-            return {"success": False, "error": "User not found"}
+            return ResponseHelper.error_response("User not found", code="USER_NOT_FOUND")
         
         # Verify current password
         if not self.auth_helper.verify_password(current_password, user.password_hash):
-            return {"success": False, "error": "Current password is incorrect"}
+            return ResponseHelper.error_response("Current password is incorrect", code="INVALID_PASSWORD")
         
         # Hash new password and update
         new_password_hash = self.auth_helper.hash_password(new_password)
