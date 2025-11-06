@@ -4,6 +4,7 @@ from .auth_helper import AuthHelper
 from .validation_helper import ValidationHelper
 from .response_helper import ResponseHelper
 from .redis_client import get_redis_client
+from .admin_helper import AdminHelper
 
 
 def get_settings():
@@ -19,5 +20,6 @@ __all__ = [
     "AuthHelper",
     "ValidationHelper",
     "ResponseHelper",
+    "AdminHelper",
     "get_redis_client"
 ]

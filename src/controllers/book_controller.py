@@ -108,29 +108,93 @@ class BookController(BaseController):
         
         def fetch_content():
             book = self.book_repo.get_by_id(book_id)
-            if not book or not book.content_path:
+            if not book:
                 return None
             
+            # Calculate total pages based on word count
             total_words = book.word_count or 50000
             total_pages = (total_words + words_per_page - 1) // words_per_page
             
             if page > total_pages:
                 return None
             
+            # Generate realistic paginated content
             start_word = (page - 1) * words_per_page
             end_word = min(start_word + words_per_page, total_words)
+            
+            # Generate sample content for this page
+            content = self._generate_page_content(book, page, start_word, end_word, words_per_page)
             
             return {
                 "book_id": book_id,
                 "book_title": book.get_display_title(),
                 "page": page,
                 "total_pages": total_pages,
-                "content": f"[Simulated content for {book.get_display_title()}, page {page}. Words {start_word}-{end_word}]",
+                "content": content,
                 "has_next": page < total_pages,
                 "has_previous": page > 1
             }
         
         return self.get_cached_or_fetch(cache_key, fetch_content)
+    
+    def _generate_page_content(self, book: Book, page: int, start_word: int, end_word: int, words_per_page: int) -> str:
+        """Generate realistic sample content for a book page."""
+        # Sample paragraphs based on book genre
+        genre = book.genre_names[0] if book.genre_names else "Fiction"
+        
+        content_templates = {
+            "Fiction": [
+                "The morning sun cast long shadows across the quiet street. Sarah walked slowly, her mind wandering through memories of yesterday.",
+                "In the distance, church bells rang out, marking the hour. Time seemed to move differently here, as if the town itself existed in another era.",
+                "She paused at the corner, watching as leaves danced in the autumn breeze. Everything felt both familiar and strange at once."
+            ],
+            "Science Fiction": [
+                "The starship's engines hummed with barely contained power as it approached the outer rim of the galaxy.",
+                "Captain Morrison studied the holographic display, analyzing the strange energy signatures emanating from the nearby nebula.",
+                "In the depths of space, nothing was ever truly silent. The universe whispered its secrets to those who knew how to listen."
+            ],
+            "Fantasy": [
+                "Magic crackled in the air as the ancient spell took hold. The wizard's eyes glowed with an otherworldly light.",
+                "Beyond the mountains lay the Forbidden Forest, where creatures of legend still roamed free under the eternal twilight.",
+                "The prophecy had spoken of this moment, when the chosen one would finally claim their destiny."
+            ],
+            "Programming": [
+                "Understanding data structures is fundamental to writing efficient code. Let's explore how arrays and linked lists differ in memory allocation.",
+                "The algorithm's time complexity can be analyzed using Big O notation. This helps us predict performance at scale.",
+                "Clean code is not just about functionality—it's about readability, maintainability, and following established patterns."
+            ]
+        }
+        
+        # Get appropriate template
+        templates = content_templates.get(genre, content_templates["Fiction"])
+        
+        # Generate paragraphs to fill the page
+        paragraphs = []
+        words_generated = 0
+        paragraph_index = 0
+        
+        while words_generated < words_per_page:
+            # Cycle through templates
+            template = templates[paragraph_index % len(templates)]
+            
+            # Add page-specific variation
+            paragraph = f"{template} [Page {page}, Section {paragraph_index + 1}]"
+            
+            # Add some additional sentences to make it more realistic
+            additional_text = f" The narrative continues to unfold, revealing deeper layers of meaning with each passing moment. Characters develop and situations evolve in unexpected ways."
+            paragraph += additional_text
+            
+            paragraphs.append(paragraph)
+            words_generated += len(paragraph.split())
+            paragraph_index += 1
+        
+        # Join paragraphs with double newlines
+        content = "\n\n".join(paragraphs)
+        
+        # Add page header
+        header = f"=== {book.get_display_title()} ===\nPage {page} of {(book.word_count or 50000) // words_per_page}\n\n"
+        
+        return header + content
     
     def update_book_rating(self, book_id: int, avg_rating: float, review_count: int) -> bool:
         """Update book's rating statistics."""

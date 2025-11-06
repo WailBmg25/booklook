@@ -17,6 +17,10 @@ class BookRepository(BaseRepository[Book]):
         """Find book by ISBN."""
         return self.db.query(Book).filter(Book.isbn == isbn).first()
     
+    def isbn_exists(self, isbn: str) -> bool:
+        """Check if ISBN already exists."""
+        return self.db.query(Book).filter(Book.isbn == isbn).first() is not None
+    
     def search_by_title(self, title: str, limit: int = 10) -> List[Book]:
         """Search books by title using ILIKE."""
         return (
@@ -132,11 +136,16 @@ class BookRepository(BaseRepository[Book]):
         """Advanced search with multiple filters."""
         query = self.db.query(Book)
         
-        # Apply search filter using full-text search
+        # Apply search filter using partial text matching (ILIKE for case-insensitive partial match)
         if search_text:
-            search_vector = func.to_tsvector('english', Book.titre + ' ' + func.coalesce(Book.description, ''))
-            search_query = func.plainto_tsquery('english', search_text)
-            query = query.filter(search_vector.op('@@')(search_query))
+            search_pattern = f"%{search_text}%"
+            query = query.filter(
+                or_(
+                    Book.titre.ilike(search_pattern),
+                    Book.description.ilike(search_pattern),
+                    func.array_to_string(Book.author_names, ' ').ilike(search_pattern)
+                )
+            )
         
         # Apply genre filter
         if genre_filter:

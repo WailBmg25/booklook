@@ -1,7 +1,7 @@
 {
 	"info": {
-		"name": "BookLook API",
-		"description": "Complete API collection for BookLook - Enhanced Book Library Application",
+		"name": "BookLook API - Phase 4.5",
+		"description": "Complete API collection for BookLook - Enhanced Book Library Application\n\n**Phase 4.5 Updates:**\n- Added paginated book content endpoints\n- Genre-specific content generation\n- New endpoint: GET /books/{book_id}/content/page/{page_number}\n- Support for configurable words per page (100-1000)\n- Examples for different book genres (Fiction, Programming, Science Fiction, Fantasy)\n\n**Available Books:**\n- Book 1: The Great Adventure (Fiction/Fantasy)\n- Book 2: Python Programming Guide (Programming)\n- Book 3: Space Odyssey (Science Fiction)\n- Book 4: Mystery Manor (Fiction)\n- Book 5: Fantasy Realm (Fantasy)\n\n**Quick Start:**\n1. Run 'Login User' to get auth token\n2. Try 'Get Book Content by Page Number' with different book IDs\n3. Explore genre-specific content in 'Book Content by Genre' folder",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
@@ -29,9 +29,197 @@
 			"key": "review_id",
 			"value": "",
 			"type": "string"
+		},
+		{
+			"key": "page_number",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "words_per_page",
+			"value": "300",
+			"type": "string"
 		}
 	],
 	"item": [
+		{
+			"name": "🚀 Quick Start - Phase 4.5",
+			"item": [
+				{
+					"name": "1. Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    pm.collectionVariables.set('auth_token', jsonData.token);",
+									"    pm.collectionVariables.set('user_id', jsonData.user.id);",
+									"    console.log('✅ Logged in successfully!');",
+									"    console.log('Token saved to collection variables');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"final_test@example.com\",\n  \"password\": \"Test1234\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Login with test account to get authentication token"
+					},
+					"response": []
+				},
+				{
+					"name": "2. Get Book List",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    console.log('✅ Found ' + jsonData.pagination.total_count + ' books');",
+									"    if (jsonData.books && jsonData.books.length > 0) {",
+									"        console.log('📚 Available books:');",
+									"        jsonData.books.forEach(book => {",
+									"            console.log('  - Book ' + book.id + ': ' + book.titre + ' (' + (book.genre_names || []).join(', ') + ')');",
+									"        });",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books?page=1&page_size=10",
+							"host": ["{{base_url}}"],
+							"path": ["books"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get list of available books"
+					},
+					"response": []
+				},
+				{
+					"name": "3. Get Fiction Book Content (Page 1)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/1/content/page/1",
+							"host": ["{{base_url}}"],
+							"path": ["books", "1", "content", "page", "1"]
+						},
+						"description": "Get first page of 'The Great Adventure' (Fiction)"
+					},
+					"response": []
+				},
+				{
+					"name": "4. Get Programming Book Content (Page 1)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/2/content/page/1",
+							"host": ["{{base_url}}"],
+							"path": ["books", "2", "content", "page", "1"]
+						},
+						"description": "Get first page of 'Python Programming Guide' (Programming)"
+					},
+					"response": []
+				},
+				{
+					"name": "5. Get Sci-Fi Book Content (Page 5)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/3/content/page/5",
+							"host": ["{{base_url}}"],
+							"path": ["books", "3", "content", "page", "5"]
+						},
+						"description": "Get page 5 of 'Space Odyssey' (Science Fiction)"
+					},
+					"response": []
+				},
+				{
+					"name": "6. Update Reading Progress",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"current_page\": 5,\n  \"total_pages\": 284\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/user/reading-progress/1",
+							"host": ["{{base_url}}"],
+							"path": ["user", "reading-progress", "1"]
+						},
+						"description": "Save reading progress for Book 1"
+					},
+					"response": []
+				},
+				{
+					"name": "7. Get Reading Progress",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{auth_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/user/reading-progress/1",
+							"host": ["{{base_url}}"],
+							"path": ["user", "reading-progress", "1"]
+						},
+						"description": "Retrieve saved reading progress for Book 1"
+					},
+					"response": []
+				}
+			],
+			"description": "Quick start workflow to test Phase 4.5 paginated reading features. Run these requests in order to see the complete flow."
+		},
 		{
 			"name": "Authentication",
 			"item": [
@@ -283,7 +471,7 @@
 					"response": []
 				},
 				{
-					"name": "Get Book Content",
+					"name": "Get Book Content (Query Param)",
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -294,14 +482,93 @@
 							"query": [
 								{
 									"key": "page",
-									"value": "1"
+									"value": "1",
+									"description": "Page number (default: 1)"
 								},
+								{
+									"key": "words_per_page",
+									"value": "300",
+									"description": "Words per page (100-1000, default: 300)"
+								}
+							]
+						},
+						"description": "Get paginated book content using query parameters. Returns content for the specified page with configurable words per page."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Book Content by Page Number (NEW)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/{{book_id}}/content/page/1?words_per_page=300",
+							"host": ["{{base_url}}"],
+							"path": ["books", "{{book_id}}", "content", "page", "1"],
+							"query": [
+								{
+									"key": "words_per_page",
+									"value": "300",
+									"description": "Words per page (100-1000, default: 300)"
+								}
+							]
+						},
+						"description": "Get specific page of book content. This is the new endpoint for paginated reading interface. Returns genre-specific content with metadata."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Book Content - Page 5 (Example)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/{{book_id}}/content/page/5?words_per_page=300",
+							"host": ["{{base_url}}"],
+							"path": ["books", "{{book_id}}", "content", "page", "5"],
+							"query": [
 								{
 									"key": "words_per_page",
 									"value": "300"
 								}
 							]
-						}
+						},
+						"description": "Example: Get page 5 of book content"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Book Content - Last Page (Example)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/1/content/page/284",
+							"host": ["{{base_url}}"],
+							"path": ["books", "1", "content", "page", "284"]
+						},
+						"description": "Example: Get last page of book 1 (284 pages total)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Book Content - Different Words Per Page",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/{{book_id}}/content/page/1?words_per_page=500",
+							"host": ["{{base_url}}"],
+							"path": ["books", "{{book_id}}", "content", "page", "1"],
+							"query": [
+								{
+									"key": "words_per_page",
+									"value": "500",
+									"description": "Try different page sizes: 100, 300, 500, 1000"
+								}
+							]
+						},
+						"description": "Example: Get content with 500 words per page (larger pages)"
 					},
 					"response": []
 				},
@@ -325,6 +592,109 @@
 								}
 							]
 						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Genres",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/metadata/genres",
+							"host": ["{{base_url}}"],
+							"path": ["books", "metadata", "genres"]
+						},
+						"description": "Get list of all unique genres available in the library"
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Authors",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/metadata/authors",
+							"host": ["{{base_url}}"],
+							"path": ["books", "metadata", "authors"]
+						},
+						"description": "Get list of all unique authors available in the library"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Book Content by Genre (Examples)",
+			"item": [
+				{
+					"name": "Fiction Book Content (Book 1)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/1/content/page/1",
+							"host": ["{{base_url}}"],
+							"path": ["books", "1", "content", "page", "1"]
+						},
+						"description": "Get content from 'The Great Adventure' (Fiction/Fantasy genre). Content includes narrative-style text."
+					},
+					"response": []
+				},
+				{
+					"name": "Programming Book Content (Book 2)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/2/content/page/1",
+							"host": ["{{base_url}}"],
+							"path": ["books", "2", "content", "page", "1"]
+						},
+						"description": "Get content from 'Python Programming Guide' (Programming genre). Content includes technical programming concepts."
+					},
+					"response": []
+				},
+				{
+					"name": "Science Fiction Book Content (Book 3)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/3/content/page/1",
+							"host": ["{{base_url}}"],
+							"path": ["books", "3", "content", "page", "1"]
+						},
+						"description": "Get content from 'Space Odyssey' (Science Fiction genre). Content includes space exploration themes."
+					},
+					"response": []
+				},
+				{
+					"name": "Fantasy Book Content (Book 5)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/5/content/page/1",
+							"host": ["{{base_url}}"],
+							"path": ["books", "5", "content", "page", "1"]
+						},
+						"description": "Get content from 'Fantasy Realm' (Fantasy genre). Content includes magic and fantasy themes."
+					},
+					"response": []
+				},
+				{
+					"name": "Compare Page 1 vs Page 10",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/books/2/content/page/10",
+							"host": ["{{base_url}}"],
+							"path": ["books", "2", "content", "page", "10"]
+						},
+						"description": "Compare content between different pages. Notice how page numbers change in the content header."
 					},
 					"response": []
 				}

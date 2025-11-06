@@ -34,6 +34,7 @@ class UserResponse(BaseModel):
     last_name: str
     photo_url: Optional[str] = None
     is_active: bool
+    is_admin: Optional[bool] = False
     created_at: datetime
 
     class Config:

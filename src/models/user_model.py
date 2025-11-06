@@ -16,6 +16,7 @@ class User(Base):
     last_name = Column(String(100), nullable=False)
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -109,7 +110,6 @@ class User(Base):
         """Convert user to dictionary for API responses."""
         data = {
             "id": self.id,
-            "email": self.email if include_sensitive else None,
             "first_name": self.first_name,
             "last_name": self.last_name,
             "full_name": self.get_full_name(),
@@ -126,6 +126,11 @@ class User(Base):
             "average_rating_given": self.get_average_rating_given(),
             "is_active_reviewer": self.is_active_reviewer()
         }
+        
+        # Add sensitive fields only when requested
+        if include_sensitive:
+            data["email"] = self.email
+            data["is_admin"] = getattr(self, 'is_admin', False)
         
         # Remove None values
         return {k: v for k, v in data.items() if v is not None}

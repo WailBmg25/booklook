@@ -12,7 +12,11 @@ from routes import (
     auth_router,
     user_router,
     review_router,
-    progress_router
+    progress_router,
+    admin_book_router,
+    admin_user_router,
+    admin_review_router,
+    admin_analytics_router
 )
 from helpers.config import settings
 
@@ -38,6 +42,12 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(user_router, prefix="/api/v1")
 app.include_router(review_router, prefix="/api/v1")
 app.include_router(progress_router, prefix="/api/v1")
+
+# Register admin routers
+app.include_router(admin_book_router, prefix="/api/v1")
+app.include_router(admin_user_router, prefix="/api/v1")
+app.include_router(admin_review_router, prefix="/api/v1")
+app.include_router(admin_analytics_router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn

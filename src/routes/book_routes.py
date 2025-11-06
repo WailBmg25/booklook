@@ -139,6 +139,45 @@ async def get_book_content(
     return BookContentResponse(**content_data)
 
 
+@book_router.get("/{book_id}/content/page/{page_number}", response_model=BookContentResponse)
+async def get_book_content_by_page(
+    book_id: int,
+    page_number: int,
+    words_per_page: int = Query(default=300, ge=100, le=1000),
+    db: Session = Depends(get_db)
+):
+    """
+    Get specific page of book content for reading (alternative endpoint).
+    
+    - **book_id**: ID of the book
+    - **page_number**: Specific page number to retrieve
+    - **words_per_page**: Words per page (default: 300, range: 100-1000)
+    """
+    if page_number < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": "Page number must be at least 1", "code": "INVALID_PAGE"}
+        )
+    
+    controller = BookController(db)
+    content_data = controller.get_book_content(book_id, page_number, words_per_page)
+    
+    if not content_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": "Book content not found or page out of range", "code": "CONTENT_NOT_FOUND"}
+        )
+    
+    # Check for validation errors
+    if "error" in content_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=content_data
+        )
+    
+    return BookContentResponse(**content_data)
+
+
 @book_router.get("/{book_id}/reviews", response_model=ReviewListResponse)
 async def get_book_reviews(
     book_id: int,
@@ -185,3 +224,31 @@ async def get_book_reviews(
     )
     
     return ReviewListResponse(reviews=reviews, pagination=pagination)
+
+
+@book_router.get("/metadata/genres", response_model=List[str])
+async def get_all_genres(db: Session = Depends(get_db)):
+    """
+    Get list of all unique genres from books.
+    """
+    from models import Book
+    from sqlalchemy import func
+    
+    # Get all unique genres from the genre_names array field
+    result = db.query(func.unnest(Book.genre_names)).distinct().all()
+    genres = [row[0] for row in result if row[0]]
+    return sorted(genres)
+
+
+@book_router.get("/metadata/authors", response_model=List[str])
+async def get_all_authors(db: Session = Depends(get_db)):
+    """
+    Get list of all unique authors from books.
+    """
+    from models import Book
+    from sqlalchemy import func
+    
+    # Get all unique authors from the author_names array field
+    result = db.query(func.unnest(Book.author_names)).distinct().all()
+    authors = [row[0] for row in result if row[0]]
+    return sorted(authors)

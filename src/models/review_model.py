@@ -15,6 +15,7 @@ class Review(Base):
     rating = Column(Integer, nullable=False)  # 1-5 stars
     title = Column(String(200), nullable=True)
     content = Column(Text, nullable=True)
+    is_flagged = Column(Integer, default=False, nullable=False)  # For moderation
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
