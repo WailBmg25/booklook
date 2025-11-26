@@ -38,6 +38,7 @@ class Book(Base):
     genres = relationship("Genre", secondary=book_genre_association, back_populates="livres")
     reviews = relationship("Review", back_populates="book", foreign_keys="Review.book_id", cascade="all, delete-orphan")
     favoris_par = relationship("User", secondary=user_favorite_association, back_populates="livres_favoris")
+    pages = relationship("BookPage", back_populates="book", cascade="all, delete-orphan", order_by="BookPage.page_number")
 
     def __repr__(self):
         return f"<Book(id={self.id}, titre='{self.titre}', isbn='{self.isbn}')>"
@@ -123,6 +124,29 @@ class Book(Base):
         if self.genres:
             self.genre_names = [genre.nom for genre in self.genres]
     
+    def get_page(self, page_number: int):
+        """Get a specific page by page number."""
+        return next((p for p in self.pages if p.page_number == page_number), None)
+    
+    def get_page_content(self, page_number: int) -> str:
+        """Get content for a specific page."""
+        page = self.get_page(page_number)
+        return page.content if page else ""
+    
+    def get_total_pages_from_content(self) -> int:
+        """Get total number of pages from stored content."""
+        return len(self.pages) if self.pages else 0
+    
+    def has_content(self) -> bool:
+        """Check if book has any content pages."""
+        return len(self.pages) > 0 if self.pages else False
+    
+    def get_content_word_count(self) -> int:
+        """Get total word count from all pages."""
+        if not self.pages:
+            return 0
+        return sum(page.word_count for page in self.pages)
+    
     def to_dict(self) -> dict:
         """Convert book to dictionary for API responses."""
         return {
@@ -142,6 +166,8 @@ class Book(Base):
             "genre_names": self.genre_names or [],
             "word_count": self.word_count,
             "content_path": self.content_path,
+            "has_content": self.has_content(),
+            "pages_count": self.get_total_pages_from_content(),
             "created_at": self.created_at,
             "updated_at": self.updated_at
         }

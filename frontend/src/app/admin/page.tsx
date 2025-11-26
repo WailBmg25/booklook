@@ -46,7 +46,7 @@ export default function AdminDashboard() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
-        <p className="mt-2 text-gray-600">System statistics and analytics</p>
+        <p className="mt-2 text-gray-900">System statistics and analytics</p>
       </div>
 
       {/* Overview Stats */}
@@ -85,18 +85,18 @@ export default function AdminDashboard() {
       {/* Recent Activity */}
       {overview && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <p className="text-sm text-gray-600">New Users (7 days)</p>
+              <p className="text-sm font-medium text-gray-900">New Users (7 days)</p>
               <p className="text-2xl font-bold text-blue-600">{overview.new_users_this_week}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">New Reviews (7 days)</p>
+              <p className="text-sm font-medium text-gray-900">New Reviews (7 days)</p>
               <p className="text-2xl font-bold text-green-600">{overview.new_reviews_this_week}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Average Rating</p>
+              <p className="text-sm font-medium text-gray-900">Average Rating</p>
               <p className="text-2xl font-bold text-yellow-600">{overview.average_book_rating.toFixed(1)} ⭐</p>
             </div>
           </div>
@@ -106,13 +106,13 @@ export default function AdminDashboard() {
       {/* Top Books */}
       {bookStats && bookStats.most_reviewed_books && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Most Reviewed Books</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Most Reviewed Books</h2>
           <div className="space-y-3">
             {bookStats.most_reviewed_books.slice(0, 5).map((book: any) => (
               <div key={book.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                 <div>
-                  <p className="font-medium">{book.title}</p>
-                  <p className="text-sm text-gray-600">{book.review_count} reviews</p>
+                  <p className="font-medium text-gray-900">{book.title}</p>
+                  <p className="text-sm text-gray-900">{book.review_count} reviews</p>
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-semibold text-yellow-600">
@@ -128,11 +128,11 @@ export default function AdminDashboard() {
       {/* Rating Distribution */}
       {reviewStats && reviewStats.rating_distribution && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Rating Distribution</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Rating Distribution</h2>
           <div className="space-y-3">
             {reviewStats.rating_distribution.map((item: any) => (
               <div key={item.rating} className="flex items-center">
-                <span className="w-16 text-sm font-medium">{item.rating} ⭐</span>
+                <span className="w-16 text-sm font-medium text-gray-900">{item.rating} ⭐</span>
                 <div className="flex-1 bg-gray-200 rounded-full h-6 mx-4">
                   <div
                     className="bg-yellow-500 h-6 rounded-full flex items-center justify-end px-2"
@@ -176,9 +176,9 @@ function StatCard({
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-600">{title}</p>
-          <p className="text-3xl font-bold mt-2">{value.toLocaleString()}</p>
-          {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+          <p className="text-sm font-medium text-gray-900">{title}</p>
+          <p className="text-3xl font-bold text-gray-900 mt-2">{value.toLocaleString()}</p>
+          {subtitle && <p className="text-sm text-gray-900 mt-1">{subtitle}</p>}
         </div>
         <div className={`text-4xl ${colorClasses[color as keyof typeof colorClasses]} p-3 rounded-lg`}>
           {icon}

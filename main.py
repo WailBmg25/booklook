@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes import (
     base_router,
     book_router,
+    book_page_router,
     auth_router,
     user_router,
     review_router,
@@ -16,7 +17,8 @@ from routes import (
     admin_book_router,
     admin_user_router,
     admin_review_router,
-    admin_analytics_router
+    admin_analytics_router,
+    admin_csv_router
 )
 from helpers.config import settings
 
@@ -38,6 +40,7 @@ app.add_middleware(
 # Register routers
 app.include_router(base_router)
 app.include_router(book_router, prefix="/api/v1")
+app.include_router(book_page_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(user_router, prefix="/api/v1")
 app.include_router(review_router, prefix="/api/v1")
@@ -48,6 +51,7 @@ app.include_router(admin_book_router, prefix="/api/v1")
 app.include_router(admin_user_router, prefix="/api/v1")
 app.include_router(admin_review_router, prefix="/api/v1")
 app.include_router(admin_analytics_router, prefix="/api/v1")
+app.include_router(admin_csv_router, prefix="/api/v1")
 
 if __name__ == "__main__":
     import uvicorn

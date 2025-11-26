@@ -9,6 +9,7 @@ export default function AdminReviewsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -59,11 +60,85 @@ export default function AdminReviewsPage() {
     }
   };
 
+  const exportToCSV = () => {
+    const csvContent = [
+      ['ID', 'User', 'Book', 'Rating', 'Title', 'Content', 'Sentiment', 'Flagged', 'Created At'].join(','),
+      ...reviews.map(review => [
+        review.id,
+        `"${review.user?.display_name || 'Unknown'}"`,
+        `"${review.book?.titre || 'Unknown'}"`,
+        review.rating,
+        `"${review.title || ''}"`,
+        `"${(review.content || '').replace(/"/g, '""')}"`,
+        review.sentiment || '',
+        review.is_flagged ? 'Yes' : 'No',
+        new Date(review.created_at).toISOString()
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reviews_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('http://localhost:8000/api/v1/admin/reviews/import', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Import failed');
+
+      const result = await response.json();
+      alert(`Successfully imported ${result.imported_count} reviews`);
+      fetchReviews();
+    } catch (error) {
+      alert('Failed to import reviews');
+    } finally {
+      setImporting(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Review Moderation</h1>
-        <p className="mt-2 text-gray-600">Manage and moderate user reviews</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Review Moderation</h1>
+          <p className="mt-2 text-gray-900">Manage and moderate user reviews</p>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={exportToCSV}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+          >
+            <span>📥</span>
+            Export CSV
+          </button>
+          <label className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer flex items-center gap-2">
+            <span>📤</span>
+            {importing ? 'Importing...' : 'Import CSV'}
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
+              disabled={importing}
+            />
+          </label>
+        </div>
       </div>
 
       {/* Filter */}
@@ -74,7 +149,11 @@ export default function AdminReviewsPage() {
               setShowFlaggedOnly(false);
               setPage(1);
             }}
-            className={`px-4 py-2 rounded-lg ${!showFlaggedOnly ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${
+              !showFlaggedOnly 
+                ? 'bg-blue-600 text-white border-blue-600' 
+                : 'bg-white text-gray-900 border-gray-300 hover:border-blue-400'
+            }`}
           >
             All Reviews
           </button>
@@ -83,7 +162,11 @@ export default function AdminReviewsPage() {
               setShowFlaggedOnly(true);
               setPage(1);
             }}
-            className={`px-4 py-2 rounded-lg ${showFlaggedOnly ? 'bg-red-600 text-white' : 'bg-gray-200'}`}
+            className={`px-4 py-2 rounded-lg border-2 font-medium transition-colors ${
+              showFlaggedOnly 
+                ? 'bg-red-600 text-white border-red-600' 
+                : 'bg-white text-gray-900 border-gray-300 hover:border-red-400'
+            }`}
           >
             Flagged Reviews
           </button>
@@ -97,7 +180,7 @@ export default function AdminReviewsPage() {
         </div>
       ) : reviews.length === 0 ? (
         <div className="bg-white rounded-lg shadow p-12 text-center">
-          <p className="text-gray-500">No reviews found</p>
+          <p className="text-gray-900">No reviews found</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -130,14 +213,14 @@ export default function AdminReviewsPage() {
 
                   {/* Review Title */}
                   {review.title && (
-                    <h3 className="text-lg font-semibold mb-2">{review.title}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{review.title}</h3>
                   )}
 
                   {/* Review Content */}
-                  <p className="text-gray-700 mb-3">{review.content || 'No content'}</p>
+                  <p className="text-gray-900 mb-3">{review.content || 'No content'}</p>
 
                   {/* Review Meta */}
-                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <div className="flex items-center gap-4 text-sm text-gray-900">
                     <span>By: {review.user?.display_name || 'Unknown'}</span>
                     <span>•</span>
                     <span>Book: {review.book?.titre || 'Unknown'}</span>
