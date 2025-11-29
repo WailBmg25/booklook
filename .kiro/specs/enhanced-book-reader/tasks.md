@@ -7,10 +7,11 @@
 - ✅ **Phase 3:** FastAPI Controllers (API endpoints) - COMPLETE (26/26 endpoints working)
 - ✅ **Phase 4:** Next.js Frontend - COMPLETE
 - ✅ **Phase 4.5:** Reading & Data Management Enhancements - COMPLETE
-- 🚀 **Phase 5:** Admin Interface - READY TO START
-- ⏳ **Phase 6:** Testing - Pending
-- ⏳ **Phase 7:** Deployment - Pending
-- ⏳ **Phase 8:** Performance Optimization - Pending
+- ✅ **Phase 5:** Admin Interface - COMPLETE
+- ✅ **Phase 5.5:** Data Loading & Import Tools - COMPLETE
+- 🚀 **Phase 6:** Testing - READY TO START
+- ⏳ **Phase 7:** Docker Deployment Setup - Pending
+- ⏳ **Phase 8:** Production Deployment Guide (400GB Database) - Pending
 
 ## 📖 How to Use This Spec
 
@@ -24,12 +25,12 @@ Context: Phase [N-1] is complete. Read PHASE_[N]_HANDOFF.md for details.
 ```
 
 ### Current Phase to Execute
-**Phase 5: Admin Interface**
+**Phase 6: Testing**
 
 Command for new session:
 ```
-Execute Phase 5 from .kiro/specs/enhanced-book-reader/tasks.md
-Phase 4.5 is complete. Implement admin interface for platform management.
+Execute Phase 6 from .kiro/specs/enhanced-book-reader/tasks.md
+Phase 5.5 is complete. Implement comprehensive testing suite.
 ```
 
 ---
@@ -297,9 +298,51 @@ Phase 4.5 is complete. Implement admin interface for platform management.
   - Add admin activity log viewer with filtering
   - _Requirements: 5.4, 5.5_
 
+## Phase 5.5: Data Loading & Import Tools ✅
+
+- [x] 5.9 Create institutional dataset loader script
+
+  - Build Python script to load institutional book datasets from CSV files
+  - Implement ISBN handling with Open Library API integration for missing ISBNs
+  - Add fallback ISBN generation using hash-based unique identifiers
+  - Support batch processing with configurable batch sizes
+  - _Requirements: 1.1, 6.1_
+
+- [x] 5.9.1 Implement CSV parsing and data validation
+
+  - Parse CSV files with book data (isbn, lccn, title, author, text, publication_date, cover_url)
+  - Handle various date formats and text page array formats
+  - Extract and normalize author names from different formats
+  - Validate data integrity before database insertion
+  - _Requirements: 1.1_
+
+- [x] 5.9.2 Add ISBN fetching and generation functionality
+
+  - Integrate Open Library API to fetch missing ISBNs based on title and author
+  - Implement rate limiting for API calls (1 second delay between requests)
+  - Generate unique hash-based ISBN substitutes (GEN-XXXXXXXXXX format) as fallback
+  - Track statistics for fetched vs generated ISBNs
+  - _Requirements: 1.1_
+
+- [x] 5.9.3 Implement book and page creation with author linking
+
+  - Create Book records with all metadata and calculated statistics
+  - Generate BookPage records for each page of content
+  - Link books to existing or newly created Author records
+  - Calculate word counts and page counts automatically
+  - _Requirements: 1.1, 1.4_
+
+- [x] 5.9.4 Add batch processing and error handling
+
+  - Process books in configurable batches for memory efficiency
+  - Implement comprehensive error handling with detailed logging
+  - Support skip-existing mode to avoid duplicate imports
+  - Generate import summary with statistics and error reports
+  - _Requirements: 6.1_
+
 ## Phase 6: Testing
 
-- [ ] 6. Add comprehensive testing suite
+- [x] 6. Add comprehensive testing suite
 
   - Create unit tests for critical backend functions
   - Build integration tests for API endpoints
@@ -307,84 +350,131 @@ Phase 4.5 is complete. Implement admin interface for platform management.
   - Add end-to-end tests for core user workflows
   - _Requirements: 6.1, 6.2, 6.3_
 
-- [ ] 6.1 Create backend unit and integration tests
+- [x] 6.1 Create backend unit and integration tests
 
   - Write unit tests for critical controller methods
   - Build integration tests for key API endpoints (auth, books, reviews)
   - Test database operations and data integrity
   - _Requirements: 6.1, 6.3_
 
-- [ ] 6.2 Implement frontend component and E2E tests
+- [x] 6.2 Implement frontend component and E2E tests
 
   - Create component tests for key React components
   - Build end-to-end tests for user registration, login, and book browsing
   - Test responsive design and basic accessibility
   - _Requirements: 2.1, 4.1_
 
-## Phase 7: Deployment
+## Phase 7: Docker Deployment Setup
 
-- [ ] 7. Set up Docker deployment configuration
+- [ ] 7. Create Docker deployment configuration
 
-  - Create Docker containers for frontend, backend, database, and Redis
-  - Configure docker-compose for development and production environments
-  - Set up basic health checks and monitoring
-  - Implement deployment scripts
+  - Build production-ready Docker containers for all services
+  - Configure docker-compose for easy deployment
+  - Set up environment configuration and secrets management
+  - Create deployment scripts and documentation
   - _Requirements: 6.3, 6.4_
 
-- [ ] 7.1 Create Docker containers for all services
+- [ ] 7.1 Create Dockerfile for FastAPI backend
 
-  - Build Dockerfile for FastAPI backend with optimized Python image
-  - Create Dockerfile for Next.js frontend with production build
-  - Configure PostgreSQL container with custom configuration for performance
-  - Set up Redis container with persistence options
+  - Build optimized multi-stage Dockerfile using Python 3.13
+  - Install production dependencies from requirements.txt
+  - Configure Uvicorn for production with proper worker settings
+  - Set up health check endpoint
+  - Optimize image size and build time
   - _Requirements: 6.3_
 
-- [ ] 7.2 Configure docker-compose for development and production
+- [ ] 7.2 Create Dockerfile for Next.js frontend
 
-  - Create docker-compose.yml for local development environment
-  - Build docker-compose.prod.yml for production deployment
-  - Set up environment variable management and secrets handling
-  - Configure volume mounts for data persistence and content storage
-  - _Requirements: 6.4_
+  - Build multi-stage Dockerfile for Next.js production build
+  - Configure Node.js environment and dependencies
+  - Set up production build with optimizations
+  - Configure environment variables for API connection
+  - Optimize image size using Alpine base
+  - _Requirements: 6.3_
 
-- [ ] 7.3 Implement health checks and basic monitoring
+- [ ] 7.3 Create production docker-compose configuration
 
-  - Add health check endpoints for all services
-  - Set up basic logging configuration
-  - Implement startup and readiness probes
-  - Add basic monitoring and alerting
+  - Build docker-compose.prod.yml with all services (backend, frontend, postgres, redis)
+  - Configure PostgreSQL with optimized settings for large datasets
+  - Set up Redis with persistence configuration
+  - Configure volume mounts for database persistence
+  - Set up service dependencies and health checks
+  - Configure restart policies for all services
   - _Requirements: 6.3, 6.4_
 
-## Phase 8: Performance Optimization (Post-MVP)
+- [ ] 7.4 Create environment configuration templates
 
-- [ ] 8. Optimize for production deployment
+  - Create .env.example files for backend and frontend
+  - Document all required environment variables
+  - Set up secrets management strategy
+  - Create configuration for different environments (dev, staging, prod)
+  - _Requirements: 6.4_
 
-  - Configure production database settings and connection pooling
-  - Set up content delivery optimization for book text
-  - Implement advanced caching strategies
-  - Add comprehensive monitoring and logging
-  - _Requirements: 6.1, 6.3, 6.4_
+- [ ] 7.5 Create deployment scripts and utilities
 
-- [ ] 8.1 Configure production database optimization
+  - Build start.sh script for easy deployment
+  - Create stop.sh and restart.sh scripts
+  - Implement backup.sh script for database backups
+  - Create logs.sh script for viewing service logs
+  - Add health-check.sh script to verify all services
+  - _Requirements: 6.4_
 
-  - Set up optimized PostgreSQL configuration for large datasets
-  - Configure connection pooling with appropriate pool sizes
-  - Implement database backup and recovery procedures
-  - Add database monitoring and performance tracking
+## Phase 8: Production Deployment Guide (400GB Database)
+
+- [ ] 8. Create comprehensive deployment documentation
+
+  - Write step-by-step deployment guide for production server
+  - Document hardware requirements for 400GB database
+  - Create guides for different deployment scenarios
+  - Include troubleshooting and maintenance procedures
+  - _Requirements: 6.4_
+
+- [ ] 8.1 Write deployment guide for dedicated server
+
+  - Document hardware requirements (CPU: 8+ cores, RAM: 32GB+, Storage: 600GB+ SSD)
+  - Create step-by-step installation guide for Ubuntu/Debian server
+  - Document Docker and Docker Compose installation
+  - Include PostgreSQL optimization settings for large datasets
+  - Document network configuration and firewall setup
+  - Provide SSL/TLS certificate setup instructions
+  - _Requirements: 6.4_
+
+- [ ] 8.2 Create Google Cloud Platform deployment guide
+
+  - Document GCP Compute Engine instance requirements
+  - Provide step-by-step GCP setup instructions
+  - Include Cloud SQL for PostgreSQL configuration (alternative)
+  - Document persistent disk setup for database storage
+  - Include load balancer and networking configuration
+  - Provide cost estimation and optimization tips
+  - _Requirements: 6.4_
+
+- [ ] 8.3 Write data loading and migration guide
+
+  - Document process for loading 400GB institutional dataset
+  - Create step-by-step guide for running load_institutional_dataset.py
+  - Include performance optimization tips for bulk imports
+  - Document database partitioning setup for large tables
+  - Provide monitoring and progress tracking instructions
+  - Include troubleshooting guide for common import issues
+  - _Requirements: 6.1, 6.4_
+
+- [ ] 8.4 Create database optimization and maintenance guide
+
+  - Document PostgreSQL configuration for 400GB+ database
+  - Include indexing strategy for optimal query performance
+  - Provide VACUUM and ANALYZE scheduling recommendations
+  - Document backup and restore procedures
+  - Include monitoring and alerting setup
+  - Provide performance tuning checklist
   - _Requirements: 6.1, 6.3_
 
-- [ ] 8.2 Set up content delivery and caching optimization
+- [ ] 8.5 Write operational runbook
 
-  - Configure content delivery for efficient book text serving
-  - Implement CDN integration for static assets
-  - Set up advanced caching strategies for improved performance
-  - Add compression and optimization for text content delivery
-  - _Requirements: 6.1, 6.2_
-
-- [ ] 8.3 Implement database replication and load balancing
-
-  - Configure PostgreSQL master-slave replication for high availability
-  - Set up Nginx load balancer for distributing requests across FastAPI instances
-  - Implement advanced health checks for all services
-  - Add comprehensive monitoring and logging configuration
+  - Document daily operational procedures
+  - Create incident response guide
+  - Include scaling and upgrade procedures
+  - Document backup verification and restoration testing
+  - Provide security hardening checklist
+  - Include disaster recovery procedures
   - _Requirements: 6.3, 6.4_
