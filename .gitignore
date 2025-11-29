@@ -1,3 +1,42 @@
+# Docker data directories
 docker/postgres_data/
 docker/redis_data/
 docker/pgadmin_data/
+
+# Documentation files in root (should be in docs/)
+/*.md
+!README.md
+!LICENSE.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.venv
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
