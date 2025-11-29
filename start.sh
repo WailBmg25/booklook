@@ -1,6 +1,9 @@
 #!/bin/bash
 
-echo "🚀 Starting BookLook Application..."
+# Check if production mode
+MODE=${1:-dev}
+
+echo "🚀 Starting BookLook Application in $MODE mode..."
 echo ""
 
 # Start Docker services (PostgreSQL and Redis)
@@ -13,11 +16,20 @@ echo "⏳ Waiting for services to start..."
 sleep 3
 
 # Start Backend (FastAPI)
-echo "🔧 Starting Backend (FastAPI)..."
-source ~/anaconda3/etc/profile.d/conda.sh
-conda activate booklook
-python main.py &
-BACKEND_PID=$!
+if [ "$MODE" = "prod" ]; then
+    echo "🔧 Starting Backend (FastAPI) with Gunicorn..."
+    source ~/anaconda3/etc/profile.d/conda.sh
+    conda activate booklook
+    cd src && ./start-production.sh &
+    BACKEND_PID=$!
+    cd ..
+else
+    echo "🔧 Starting Backend (FastAPI) in development mode..."
+    source ~/anaconda3/etc/profile.d/conda.sh
+    conda activate booklook
+    python main.py &
+    BACKEND_PID=$!
+fi
 
 # Wait for backend to start
 sleep 2
