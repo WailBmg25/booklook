@@ -62,6 +62,18 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # Import settings to get database configuration
+    from helpers.config import settings
+    
+    # Build database URL from settings (supports environment variables)
+    db_url = (
+        f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}"
+        f"@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
+    )
+    
+    # Override the URL in config
+    config.set_main_option("sqlalchemy.url", db_url)
+    
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
