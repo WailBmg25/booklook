@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
-from typing import Optional, List
-from pydantic import field_validator
+from typing import Optional, Union
+from pydantic import field_validator, computed_field
 
 
 class Settings(BaseSettings):
@@ -23,18 +23,14 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: Optional[str] = None
     CACHE_TTL: int = 3600  # 1 heure en secondes
     
-    # CORS
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-    ]
+    # CORS - stored as string, parsed to list
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
     
-    @field_validator('CORS_ORIGINS', mode='before')
-    @classmethod
-    def parse_cors_origins(cls, v):
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(',')]
-        return v
+    def get_cors_origins_list(self) -> list[str]:
+        """Parse CORS_ORIGINS string into a list."""
+        if not self.CORS_ORIGINS or not self.CORS_ORIGINS.strip():
+            return ["http://localhost:3000", "http://localhost:3001"]
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(',') if origin.strip()]
     
     # Pagination
     DEFAULT_PAGE_SIZE: int = 20
@@ -42,7 +38,11 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        env_file_encoding = 'utf-8'
         case_sensitive = True
+        # Allow environment variables to override .env file
+        env_ignore_empty = True
+        extra = 'ignore'
 
 
 settings = Settings()
