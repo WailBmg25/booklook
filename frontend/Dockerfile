@@ -10,13 +10,16 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install all dependencies (including dev dependencies needed for build)
+RUN npm ci
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+
+# Copy package files first
+COPY package.json package-lock.json* ./
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
@@ -26,9 +29,8 @@ COPY . .
 
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
 
-# Build the application
+# Build the application (don't set NODE_ENV=production yet to keep devDependencies)
 RUN npm run build
 
 # Stage 3: Runner
