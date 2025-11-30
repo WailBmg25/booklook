@@ -3,16 +3,6 @@ docker/postgres_data/
 docker/redis_data/
 docker/pgadmin_data/
 
-# Documentation files in root (keep only README)
-/*.md
-!README.md
-!LICENSE.md
-
-# Documentation files in root (should be in docs/)
-/*.md
-!README.md
-!LICENSE.md
-
 # Python
 __pycache__/
 *.py[cod]
@@ -34,7 +24,8 @@ build/
 venv/
 ENV/
 
-# IDE
+# IDE and Editor
+.kiro/
 .vscode/
 .idea/
 *.swp
