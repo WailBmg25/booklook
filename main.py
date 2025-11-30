@@ -37,6 +37,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Health check endpoint (root level for Docker healthcheck)
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker and load balancers."""
+    return {"status": "healthy", "service": "booklook-backend"}
+
 # Register routers
 app.include_router(base_router)
 app.include_router(book_router, prefix="/api/v1")
