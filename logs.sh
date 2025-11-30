@@ -17,6 +17,13 @@ COMPOSE_FILE="docker-compose.prod.yml"
 ENV_FILE=".env.production"
 PROJECT_NAME="booklook"
 
+# Detect docker compose command
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    DOCKER_COMPOSE="docker-compose"
+fi
+
 # Functions
 print_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -33,10 +40,10 @@ show_logs() {
     
     if [ "$follow" = "true" ]; then
         print_info "Following logs for $service (Ctrl+C to exit)..."
-        docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs -f --tail="$lines" "$service"
+        $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs -f --tail="$lines" "$service"
     else
         print_info "Showing last $lines lines for $service..."
-        docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs --tail="$lines" "$service"
+        $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs --tail="$lines" "$service"
     fi
 }
 
@@ -46,10 +53,10 @@ show_all_logs() {
     
     if [ "$follow" = "true" ]; then
         print_info "Following all service logs (Ctrl+C to exit)..."
-        docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs -f --tail="$lines"
+        $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs -f --tail="$lines"
     else
         print_info "Showing last $lines lines for all services..."
-        docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs --tail="$lines"
+        $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs --tail="$lines"
     fi
 }
 
@@ -58,10 +65,10 @@ show_errors() {
     
     if [ -z "$service" ]; then
         print_info "Showing errors from all services..."
-        docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs | grep -i "error\|exception\|failed\|fatal"
+        $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs | grep -i "error\|exception\|failed\|fatal"
     else
         print_info "Showing errors from $service..."
-        docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs "$service" | grep -i "error\|exception\|failed\|fatal"
+        $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" logs "$service" | grep -i "error\|exception\|failed\|fatal"
     fi
 }
 

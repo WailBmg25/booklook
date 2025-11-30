@@ -16,6 +16,13 @@ NC='\033[0m' # No Color
 COMPOSE_FILE="docker-compose.prod.yml"
 ENV_FILE=".env.production"
 PROJECT_NAME="booklook"
+
+# Detect docker compose command
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    DOCKER_COMPOSE="docker-compose"
+fi
 BACKUP_DIR="./backups"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
@@ -60,7 +67,7 @@ backup_database() {
     print_info "User: $POSTGRES_USER"
     
     # Create backup using docker exec
-    docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T postgres \
+    $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T postgres \
         pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists | gzip > "$backup_file"
     
     if [ $? -eq 0 ]; then
@@ -116,7 +123,7 @@ restore_database() {
     print_info "Restoring database..."
     
     # Restore backup using docker exec
-    gunzip -c "$backup_file" | docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T postgres \
+    gunzip -c "$backup_file" | $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T postgres \
         psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
     
     if [ $? -eq 0 ]; then

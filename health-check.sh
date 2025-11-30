@@ -17,6 +17,13 @@ COMPOSE_FILE="docker-compose.prod.yml"
 ENV_FILE=".env.production"
 PROJECT_NAME="booklook"
 
+# Detect docker compose command
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    DOCKER_COMPOSE="docker-compose"
+fi
+
 # Load environment variables
 if [ -f "$ENV_FILE" ]; then
     export $(cat "$ENV_FILE" | grep -v '^#' | xargs)
@@ -81,7 +88,7 @@ check_http_endpoint() {
 }
 
 check_postgres() {
-    if docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T postgres pg_isready -U "${POSTGRES_USER:-bookuser}" &>/dev/null; then
+    if $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T postgres pg_isready -U "${POSTGRES_USER:-bookuser}" &>/dev/null; then
         print_success "PostgreSQL is accepting connections"
         return 0
     else
@@ -91,7 +98,7 @@ check_postgres() {
 }
 
 check_redis() {
-    if docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T redis redis-cli ping &>/dev/null; then
+    if $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec -T redis redis-cli ping &>/dev/null; then
         print_success "Redis is responding"
         return 0
     else
