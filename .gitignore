@@ -18,8 +18,13 @@ __pycache__/
 dist/
 build/
 
-# Environment
+# Environment - only ignore actual .env files, not examples
 .env
+.env.local
+.env.production
+.env.development
+.env.staging
+!.env*.example
 .venv
 venv/
 ENV/

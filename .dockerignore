@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker/
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# Tests
+src/tests/
+*.test.py
+pytest.ini
+.pytest_cache/
+
+# Frontend
+frontend/
+node_modules/
+
+# Database
+docker/postgres_data/
+docker/pgadmin_data/
+docker/redis_data/
+*.db
+*.sqlite
+
+# Environment files (will be provided at runtime)
+.env
+.env.*
+!.env.example
+
+# Scripts
+*.sh
+test_*.py
+add_sample_*.py
+load_*.py
+
+# Postman
+*.postman_collection.json
+
+# Logs
+*.log
+logs/

@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // Enable standalone output for Docker deployment
+  output: 'standalone',
 };
 
 export default nextConfig;
