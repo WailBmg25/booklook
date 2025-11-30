@@ -106,8 +106,13 @@ show_logs() {
 
 run_migrations() {
     print_info "Running database migrations..."
-    $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec backend alembic upgrade head
-    print_success "Migrations completed successfully."
+    $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec backend bash -c "cd src && alembic upgrade head"
+    if [ $? -eq 0 ]; then
+        print_success "Migrations completed successfully."
+    else
+        print_error "Migrations failed. Check the logs for details."
+        return 1
+    fi
 }
 
 health_check() {
