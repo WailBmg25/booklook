@@ -115,6 +115,42 @@ run_migrations() {
     fi
 }
 
+load_dataset() {
+    local data_path=$1
+    
+    if [ -z "$data_path" ]; then
+        print_error "Please provide path to CSV file or directory"
+        print_info "Usage: ./deploy.sh load-data /path/to/csv/files"
+        return 1
+    fi
+    
+    if [ ! -e "$data_path" ]; then
+        print_error "Path does not exist: $data_path"
+        return 1
+    fi
+    
+    print_info "Loading institutional dataset from: $data_path"
+    print_info "This may take a while depending on dataset size..."
+    
+    # Copy data to container and run loader
+    $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec backend bash -c "
+        python load_institutional_dataset.py /app/data --skip-existing
+    " || {
+        # If data not mounted, try copying
+        print_info "Copying data to container..."
+        docker cp "$data_path" "${PROJECT_NAME}_backend:/app/data"
+        $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec backend \
+            python load_institutional_dataset.py /app/data --skip-existing
+    }
+    
+    if [ $? -eq 0 ]; then
+        print_success "Dataset loaded successfully!"
+    else
+        print_error "Dataset loading failed. Check the logs for details."
+        return 1
+    fi
+}
+
 health_check() {
     print_info "Performing health check..."
     
@@ -140,24 +176,25 @@ BookLook Deployment Script
 Usage: ./deploy.sh [COMMAND] [OPTIONS]
 
 Commands:
-    start           Start all services
-    stop            Stop all services
-    restart         Restart all services
-    build           Build Docker images
-    deploy          Build and start services (full deployment)
-    status          Show service status
-    logs [service]  Show logs (optionally for specific service)
-    migrate         Run database migrations
-    health          Perform health check
-    pgadmin         Start with pgAdmin (database management UI)
-    help            Show this help message
+    start              Start all services
+    stop               Stop all services
+    restart            Restart all services
+    build              Build Docker images
+    deploy             Build and start services (full deployment)
+    status             Show service status
+    logs [service]     Show logs (optionally for specific service)
+    migrate            Run database migrations
+    load-data <path>   Load institutional dataset from CSV files
+    health             Perform health check
+    pgadmin            Start with pgAdmin (database management UI)
+    help               Show this help message
 
 Examples:
-    ./deploy.sh deploy          # Full deployment
-    ./deploy.sh pgadmin         # Deploy with pgAdmin at http://localhost:5050
-    ./deploy.sh start           # Start services
-    ./deploy.sh logs backend    # Show backend logs
-    ./deploy.sh migrate         # Run migrations
+    ./deploy.sh deploy                      # Full deployment
+    ./deploy.sh migrate                     # Run migrations
+    ./deploy.sh load-data /path/to/csvs     # Load book dataset
+    ./deploy.sh pgadmin                     # Deploy with pgAdmin
+    ./deploy.sh logs backend                # Show backend logs
 
 EOF
 }
@@ -203,6 +240,9 @@ case "$1" in
         ;;
     migrate)
         run_migrations
+        ;;
+    load-data)
+        load_dataset "$2"
         ;;
     health)
         health_check

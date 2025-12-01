@@ -58,6 +58,28 @@ docker logs booklook-postgres
 docker logs booklook-redis
 ```
 
+### 8. Load Institutional Dataset (Optional)
+```bash
+# Load books from CSV files
+./deploy.sh load-data /path/to/csv/files
+
+# Or load a single CSV file
+./deploy.sh load-data /path/to/books.csv
+```
+
+### 9. Access pgAdmin (Optional)
+```bash
+# Start with pgAdmin for database management
+./deploy.sh pgadmin
+
+# Access at http://localhost:5050
+# Connect to PostgreSQL:
+#   Host: postgres
+#   Port: 5432
+#   Database: book_library
+#   Username/Password: from .env.production
+```
+
 ## 🔍 Troubleshooting
 
 ### If frontend container fails:
