@@ -149,10 +149,12 @@ Commands:
     logs [service]  Show logs (optionally for specific service)
     migrate         Run database migrations
     health          Perform health check
+    pgadmin         Start with pgAdmin (database management UI)
     help            Show this help message
 
 Examples:
     ./deploy.sh deploy          # Full deployment
+    ./deploy.sh pgadmin         # Deploy with pgAdmin at http://localhost:5050
     ./deploy.sh start           # Start services
     ./deploy.sh logs backend    # Show backend logs
     ./deploy.sh migrate         # Run migrations
@@ -204,6 +206,23 @@ case "$1" in
         ;;
     health)
         health_check
+        ;;
+    pgadmin)
+        check_requirements
+        print_info "Starting services with pgAdmin..."
+        $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" --profile with-pgadmin up -d
+        print_success "Services started with pgAdmin!"
+        print_info "Access pgAdmin at: http://localhost:5050"
+        print_info "Default credentials:"
+        print_info "  Email: admin@booklook.com"
+        print_info "  Password: (check your .env.production file)"
+        print_info ""
+        print_info "To connect to PostgreSQL in pgAdmin:"
+        print_info "  Host: postgres"
+        print_info "  Port: 5432"
+        print_info "  Database: book_library"
+        print_info "  Username: (check your .env.production file)"
+        print_info "  Password: (check your .env.production file)"
         ;;
     help|--help|-h)
         show_help
