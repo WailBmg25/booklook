@@ -39,9 +39,12 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy application code
 COPY main.py .
 COPY src/ ./src/
+COPY load_institutional_dataset.py .
+COPY add_sample_data.py .
+COPY add_sample_book_content.py .
 
-# Create directory for logs
-RUN mkdir -p /app/logs
+# Create directories for logs and data
+RUN mkdir -p /app/logs /app/data
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
