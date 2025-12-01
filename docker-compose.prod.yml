@@ -94,6 +94,8 @@ services:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./logs:/app/logs
+      # Mount dataset directory (read-only) - set DATASET_PATH in .env.production
+      - ${DATASET_PATH:-./data}:/app/dataset:ro
     networks:
       - booklook_network
     depends_on:

@@ -121,6 +121,7 @@ load_dataset() {
     if [ -z "$data_path" ]; then
         print_error "Please provide path to CSV file or directory"
         print_info "Usage: ./deploy.sh load-data /path/to/csv/files"
+        print_info "Or set DATASET_PATH in .env.production and use: ./deploy.sh load-data"
         return 1
     fi
     
@@ -130,25 +131,39 @@ load_dataset() {
     fi
     
     print_info "Loading institutional dataset from: $data_path"
-    print_info "Copying data to container..."
+    print_info "Using volume mount (no copying needed)..."
     
-    # Clean up old data directory in container
-    docker exec "${PROJECT_NAME}_backend" rm -rf /app/data/* 2>/dev/null || true
+    # Check if path is already mounted
+    local mounted_path=$(docker inspect "${PROJECT_NAME}_backend" --format='{{range .Mounts}}{{if eq .Destination "/app/dataset"}}{{.Source}}{{end}}{{end}}')
     
-    # Copy data to container
-    if [ -d "$data_path" ]; then
-        # If directory, copy contents
-        docker cp "$data_path/." "${PROJECT_NAME}_backend:/app/data/"
+    if [ "$mounted_path" = "$data_path" ]; then
+        print_info "Dataset already mounted at /app/dataset"
+        target_path="/app/dataset"
     else
-        # If file, copy file
-        docker cp "$data_path" "${PROJECT_NAME}_backend:/app/data/"
+        print_warning "Dataset not mounted. Updating DATASET_PATH and restarting backend..."
+        
+        # Update .env.production with new path
+        if grep -q "^DATASET_PATH=" "$ENV_FILE"; then
+            sed -i "s|^DATASET_PATH=.*|DATASET_PATH=$data_path|" "$ENV_FILE"
+        else
+            echo "DATASET_PATH=$data_path" >> "$ENV_FILE"
+        fi
+        
+        # Restart backend with new mount
+        print_info "Restarting backend with dataset mount..."
+        $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" up -d backend
+        
+        print_info "Waiting for backend to be ready..."
+        sleep 10
+        
+        target_path="/app/dataset"
     fi
     
     print_info "Running data loader..."
     print_info "This may take a while depending on dataset size..."
     
     # Run the loader
-    docker exec "${PROJECT_NAME}_backend" python load_institutional_dataset.py /app/data --skip-existing
+    docker exec "${PROJECT_NAME}_backend" python load_institutional_dataset.py "$target_path" --skip-existing
     
     if [ $? -eq 0 ]; then
         print_success "Dataset loaded successfully!"
