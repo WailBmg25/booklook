@@ -130,18 +130,25 @@ load_dataset() {
     fi
     
     print_info "Loading institutional dataset from: $data_path"
+    print_info "Copying data to container..."
+    
+    # Clean up old data directory in container
+    docker exec "${PROJECT_NAME}_backend" rm -rf /app/data/* 2>/dev/null || true
+    
+    # Copy data to container
+    if [ -d "$data_path" ]; then
+        # If directory, copy contents
+        docker cp "$data_path/." "${PROJECT_NAME}_backend:/app/data/"
+    else
+        # If file, copy file
+        docker cp "$data_path" "${PROJECT_NAME}_backend:/app/data/"
+    fi
+    
+    print_info "Running data loader..."
     print_info "This may take a while depending on dataset size..."
     
-    # Copy data to container and run loader
-    $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec backend bash -c "
-        python load_institutional_dataset.py /app/data --skip-existing
-    " || {
-        # If data not mounted, try copying
-        print_info "Copying data to container..."
-        docker cp "$data_path" "${PROJECT_NAME}_backend:/app/data"
-        $DOCKER_COMPOSE -f "$COMPOSE_FILE" --env-file "$ENV_FILE" -p "$PROJECT_NAME" exec backend \
-            python load_institutional_dataset.py /app/data --skip-existing
-    }
+    # Run the loader
+    docker exec "${PROJECT_NAME}_backend" python load_institutional_dataset.py /app/data --skip-existing
     
     if [ $? -eq 0 ]; then
         print_success "Dataset loaded successfully!"
