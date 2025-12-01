@@ -61,8 +61,9 @@ docker/redis_data/
 # Scripts
 *.sh
 test_*.py
-add_sample_*.py
-load_*.py
+# Keep data loading scripts for production
+# add_sample_*.py
+# load_*.py
 
 # Postman
 *.postman_collection.json
