@@ -26,6 +26,9 @@ import requests
 import time
 import hashlib
 
+# Increase CSV field size limit to handle large book content
+csv.field_size_limit(10 * 1024 * 1024)  # 10MB per field
+
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
