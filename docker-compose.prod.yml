@@ -167,13 +167,13 @@ services:
     profiles:
       - with-pgadmin
 
-  # Nginx Reverse Proxy (Optional - for production load balancing)
+  # Nginx Reverse Proxy (Required for ngrok single tunnel setup)
   nginx:
     image: nginx:alpine
     container_name: booklook_nginx
     restart: unless-stopped
     ports:
-      - "${NGINX_HTTP_PORT:-80}:80"
+      - "0.0.0.0:${NGINX_HTTP_PORT:-80}:80"
       - "${NGINX_HTTPS_PORT:-443}:443"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
@@ -189,8 +189,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    profiles:
-      - with-nginx
 
 networks:
   booklook_network:
