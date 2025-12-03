@@ -33,7 +33,7 @@ class BookResponse(BaseModel):
     isbn: Optional[str] = None
     author_names: Optional[List[str]] = []
     genre_names: Optional[List[str]] = []
-    date_publication: Optional[int] = None
+    date_publication: Optional[str] = None  # Changed from int to str to handle date objects
     description: Optional[str] = None
     average_rating: Optional[float] = 0.0
     review_count: Optional[int] = 0
@@ -52,7 +52,7 @@ class BookDetailResponse(BaseModel):
     isbn: Optional[str] = None
     author_names: Optional[List[str]] = []
     genre_names: Optional[List[str]] = []
-    date_publication: Optional[int] = None
+    date_publication: Optional[str] = None  # Changed from int to str to handle date objects
     description: Optional[str] = None
     average_rating: Optional[float] = 0.0
     review_count: Optional[int] = 0
