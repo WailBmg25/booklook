@@ -91,7 +91,7 @@ services:
       WORKERS: ${BACKEND_WORKERS:-4}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./logs:/app/logs
       # Mount dataset directory (read-only) - set DATASET_PATH in .env.production
@@ -126,7 +126,7 @@ services:
       # Node
       NODE_ENV: production
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "0.0.0.0:${FRONTEND_PORT:-3000}:3000"
     networks:
       - booklook_network
     depends_on:
@@ -150,7 +150,7 @@ services:
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
     ports:
-      - "${PGADMIN_PORT:-5050}:80"
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     networks:
