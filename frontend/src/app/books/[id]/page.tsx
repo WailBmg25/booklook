@@ -170,7 +170,9 @@ export default function BookDetailsPage() {
               </h1>
 
               <p className="text-lg text-gray-600 mb-4">
-                {book.auteur || "Unknown Author"}
+                {book.author_names && book.author_names.length > 0
+                  ? book.author_names.join(", ")
+                  : "Unknown Author"}
               </p>
 
               {/* Rating */}

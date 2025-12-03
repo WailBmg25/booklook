@@ -204,7 +204,11 @@ export default function ReadingPage() {
           </button>
           <div>
             <h1 className="font-semibold">{book?.titre}</h1>
-            <p className="text-sm opacity-70">{book?.auteur}</p>
+            <p className="text-sm opacity-70">
+              {book?.author_names && book.author_names.length > 0
+                ? book.author_names.join(", ")
+                : "Unknown Author"}
+            </p>
           </div>
         </div>
 
