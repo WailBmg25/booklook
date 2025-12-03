@@ -59,16 +59,17 @@ load_dotenv('.env.production')
 # ============================================================================
 
 # HuggingFace Configuration
-HF_TOKEN = os.getenv('HUGGINGFACE_TOKEN', '')
+# TODO: Replace with your HuggingFace token from https://huggingface.co/settings/tokens
+HF_TOKEN = "YOUR_HUGGINGFACE_TOKEN_HERE"
 DATASET_NAME = "institutional/institutional-books-1.0"
 
 # Database Configuration
 DB_CONFIG = {
-    'host': os.getenv('POSTGRES_HOST', 'localhost'),
-    'port': int(os.getenv('POSTGRES_PORT', 5432)),
-    'database': os.getenv('POSTGRES_DB', 'book_library'),
-    'user': os.getenv('POSTGRES_USER', 'bookuser'),
-    'password': os.getenv('POSTGRES_PASSWORD', 'bookpass123')
+    'host': 'localhost',
+    'port': 5432,
+    'database': 'book_library',
+    'user': 'bookuser',
+    'password': 'bookpass123'
 }
 
 # Processing Configuration
@@ -79,8 +80,9 @@ MAX_RETRIES = 3   # Retry attempts for API calls
 # Progress tracking file
 PROGRESS_FILE = "load_progress.json"
 
-# API Keys (optional, improves results)
-GOOGLE_BOOKS_API_KEY = os.getenv('GOOGLE_BOOKS_API_KEY', '')
+# API Keys (optional, improves ISBN lookup results)
+# Get your key from: https://console.cloud.google.com/apis/credentials
+GOOGLE_BOOKS_API_KEY = ''  # Optional: Add your Google Books API key here
 
 # ============================================================================
 # DATASET FIELD DESCRIPTIONS
