@@ -153,7 +153,7 @@ class Book(Base):
             "id": self.id,
             "titre": self.titre,
             "isbn": self.isbn,
-            "date_publication": self.date_publication,
+            "date_publication": str(self.date_publication) if self.date_publication else None,
             "description": self.description,
             "image_url": self.image_url,
             "nombre_pages": self.nombre_pages,
