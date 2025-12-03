@@ -30,6 +30,18 @@ COPY . .
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Accept build arguments for Next.js public env vars
+ARG NEXT_PUBLIC_API_URL
+ARG NEXTAUTH_URL
+ARG NEXTAUTH_SECRET
+ARG AUTH_TRUST_HOST
+
+# Set them as environment variables for the build
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXTAUTH_URL=$NEXTAUTH_URL
+ENV NEXTAUTH_SECRET=$NEXTAUTH_SECRET
+ENV AUTH_TRUST_HOST=$AUTH_TRUST_HOST
+
 # Build the application (don't set NODE_ENV=production yet to keep devDependencies)
 RUN npm run build
 
