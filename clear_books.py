@@ -14,14 +14,19 @@ This will delete:
 
 import psycopg2
 import sys
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv('.env.production')
 
 # Database configuration
 DB_CONFIG = {
-    'host': 'localhost',
-    'port': 5432,
-    'database': 'book_library',
-    'user': 'bookuser',
-    'password': 'bookpass123'
+    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'port': int(os.getenv('POSTGRES_PORT', 5432)),
+    'database': os.getenv('POSTGRES_DB', 'book_library'),
+    'user': os.getenv('POSTGRES_USER', 'bookuser'),
+    'password': os.getenv('POSTGRES_PASSWORD', 'bookpass123')
 }
 
 def clear_database():
