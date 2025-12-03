@@ -1,39 +1,55 @@
 #!/usr/bin/env python3
 """
-BookLook Enhanced Data Loader for Institutional Books Dataset
+Institutional Books Dataset Loader for BookLook
+================================================
 
-This script loads books from HuggingFace institutional/institutional-books-1.0 dataset with:
-- Streaming: Memory-efficient chunked loading (100 books per batch)
-- ISBN Lookup: Google Books API + Open Library + isbnlib fallback
-- Cover Images: Multiple sources with fallbacks
-- Authentication: HuggingFace token support
+This script loads books from the HuggingFace institutional/institutional-books-1.0 dataset
+into the BookLook database with the following features:
 
-Dataset Columns (from institutional/institutional-books-1.0):
-- barcode_src: Unique identifier for the book
+Features:
+- Streaming dataset loading (memory efficient)
+- Chunked processing (100 books per batch)
+- Resume capability (continues from last loaded book)
+- ISBN extraction and lookup
+- Cover image fetching from multiple sources
+- Progress tracking and detailed logging
+- Error handling and retry logic
+
+Dataset Fields:
+- barcode_src: Unique identifier from source
 - title_src: Book title
 - author_src: Author name(s)
-- date1_src: Primary publication date
-- date2_src: Secondary date (if applicable)
+- date1_src/date2_src: Publication dates
 - page_count_src: Number of pages
-- language_src: Language code
-- topic_or_subject_src: Subject/topic classification
-- genre_or_form_src: Genre classification
-- identifiers_src: Contains ISBN, LCCN, OCOLC identifiers
-- text_by_page_src: Full text content by page
+- language_src/language_gen: Language information
+- topic_or_subject_src/gen: Subject/topic classification
+- text_by_page_src/gen: Full text content by page
+- identifiers_src: ISBN, LCCN, OCLC identifiers
+- hathitrust_data_ext: External HathiTrust data
+
+Requirements:
+    pip install datasets huggingface-hub psycopg2-binary requests python-dotenv isbnlib
+
+Usage:
+    python load_institutional_books.py [--max-chunks N] [--resume]
 """
 
 import os
-import random
-import requests
-from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+import sys
+import json
+import time
+import argparse
+import re
+from typing import List, Dict, Optional, Tuple
+from datetime import datetime
+from pathlib import Path
+
 import psycopg2
-from psycopg2.extras import execute_batch
+from psycopg2.extras import execute_values
+import requests
 from datasets import load_dataset
 from huggingface_hub import login
 from dotenv import load_dotenv
-import time
-import isbnlib
 
 # Load environment variables
 load_dotenv('.env.production')
@@ -42,95 +58,144 @@ load_dotenv('.env.production')
 # CONFIGURATION
 # ============================================================================
 
-# HuggingFace Authentication
+# HuggingFace Configuration
 HF_TOKEN = os.getenv('HUGGINGFACE_TOKEN', '')
-if HF_TOKEN:
-    login(token=HF_TOKEN)
-    print("✅ Logged in to HuggingFace")
-else:
-    print("⚠️  No HuggingFace token - proceeding without authentication")
+DATASET_NAME = "institutional/institutional-books-1.0"
 
-# Database configuration
+# Database Configuration
 DB_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': int(os.getenv('DB_PORT', 5432)),
-    'database': os.getenv('DB_NAME', 'book_library'),
-    'user': os.getenv('DB_USER', 'bookuser'),
-    'password': os.getenv('DB_PASSWORD', 'bookpass123')
+    'host': os.getenv('POSTGRES_HOST', 'localhost'),
+    'port': int(os.getenv('POSTGRES_PORT', 5432)),
+    'database': os.getenv('POSTGRES_DB', 'book_library'),
+    'user': os.getenv('POSTGRES_USER', 'bookuser'),
+    'password': os.getenv('POSTGRES_PASSWORD', 'bookpass123')
 }
 
-# Dataset configuration
-DATASET_NAME = "institutional/institutional-books-1.0"
-CHUNK_SIZE = 100  # Load 100 books at a time
-MAX_CHUNKS = 10  # Set to None for all books, or number for testing (10 = 1000 books)
+# Processing Configuration
+CHUNK_SIZE = 100  # Books per batch
+API_DELAY = 0.5   # Seconds between API calls
+MAX_RETRIES = 3   # Retry attempts for API calls
 
-# API rate limiting
-API_DELAY = 0.5  # Seconds between API calls
-GOOGLE_BOOKS_API_KEY = os.getenv('GOOGLE_BOOKS_API_KEY', '')  # Optional
+# Progress tracking file
+PROGRESS_FILE = "load_progress.json"
 
-print(f"\n📚 Dataset: {DATASET_NAME}")
-print(f"📦 Chunk size: {CHUNK_SIZE} books per batch")
-print(f"🔌 Database: {DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}\n")
+# API Keys (optional, improves results)
+GOOGLE_BOOKS_API_KEY = os.getenv('GOOGLE_BOOKS_API_KEY', '')
 
 # ============================================================================
-# DATASET COLUMN DESCRIPTIONS
+# DATASET FIELD DESCRIPTIONS
 # ============================================================================
 
-DATASET_COLUMNS = {
-    'barcode_src': 'Unique barcode identifier from source library',
+DATASET_FIELDS = {
+    'barcode_src': 'Unique barcode identifier from source institution',
     'title_src': 'Book title from source metadata',
     'author_src': 'Author name(s) from source metadata',
     'date1_src': 'Primary publication date',
-    'date2_src': 'Secondary date (reprint, edition, etc.)',
-    'date_types_src': 'Type of dates provided',
+    'date2_src': 'Secondary publication date (reprint, edition)',
+    'date_types_src': 'Type of dates (publication, copyright, etc.)',
     'page_count_src': 'Number of pages in the book',
     'token_count_o200k_base_gen': 'Token count using o200k_base tokenizer',
     'language_src': 'Language code from source',
     'language_gen': 'Generated/detected language',
     'language_distribution_gen': 'Language distribution analysis',
-    'topic_or_subject_src': 'Subject classification from source',
+    'topic_or_subject_src': 'Subject/topic from source metadata',
     'topic_or_subject_gen': 'Generated topic classification',
-    'genre_or_form_src': 'Genre classification from source',
+    'topic_or_subject_score_gen': 'Confidence score for topic',
+    'genre_or_form_src': 'Genre or form from source',
     'general_note_src': 'General notes about the book',
     'ocr_score_src': 'OCR quality score from source',
     'ocr_score_gen': 'Generated OCR quality score',
-    'identifiers_src': 'Contains ISBN, LCCN, OCOLC identifiers',
-    'text_by_page_src': 'Full text content by page (original OCR)',
-    'text_by_page_gen': 'Full text content by page (cleaned/generated)',
+    'likely_duplicates_barcodes_gen': 'Barcodes of likely duplicate entries',
     'text_analysis_gen': 'Text analysis statistics',
-    'hathitrust_data_ext': 'HathiTrust metadata and links'
+    'identifiers_src': 'ISBN, LCCN, OCLC identifiers',
+    'hathitrust_data_ext': 'HathiTrust external data',
+    'text_by_page_src': 'Original OCR text by page',
+    'text_by_page_gen': 'Cleaned/generated text by page'
 }
 
-print("📋 DATASET COLUMN DESCRIPTIONS:")
-print("=" * 80)
-for col, desc in DATASET_COLUMNS.items():
-    print(f"  • {col:35} : {desc}")
-print("=" * 80 + "\n")
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
 
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
+def print_header():
+    """Print script header."""
+    print("=" * 80)
+    print("📚 Institutional Books Dataset Loader for BookLook")
+    print("=" * 80)
+    print(f"Dataset: {DATASET_NAME}")
+    print(f"Chunk Size: {CHUNK_SIZE} books per batch")
+    print(f"Database: {DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}")
+    print("=" * 80)
+    print()
+
+
+def print_dataset_info():
+    """Print dataset field information."""
+    print("\n📋 Dataset Fields:")
+    print("-" * 80)
+    for field, description in DATASET_FIELDS.items():
+        print(f"  • {field:35s} : {description}")
+    print("-" * 80)
+    print()
+
+
+def load_progress() -> Dict:
+    """Load progress from file."""
+    if os.path.exists(PROGRESS_FILE):
+        with open(PROGRESS_FILE, 'r') as f:
+            return json.load(f)
+    return {
+        'last_processed_index': -1,
+        'total_loaded': 0,
+        'last_barcode': None,
+        'timestamp': None
+    }
+
+
+def save_progress(index: int, total: int, barcode: str):
+    """Save progress to file."""
+    progress = {
+        'last_processed_index': index,
+        'total_loaded': total,
+        'last_barcode': barcode,
+        'timestamp': datetime.now().isoformat()
+    }
+    with open(PROGRESS_FILE, 'w') as f:
+        json.dump(progress, f, indent=2)
+
 
 def extract_isbn_from_identifiers(identifiers: Dict) -> Optional[str]:
-    """Extract ISBN from identifiers_src field."""
+    """Extract ISBN from identifiers dictionary."""
     if not identifiers:
         return None
     
-    isbn_list = identifiers.get('isbn', [])
-    if isbn_list and len(isbn_list) > 0:
-        # Return first valid ISBN
-        for isbn in isbn_list:
-            if isbn and len(isbn) >= 10:
-                return isbn.strip()
+    # Try ISBN field first
+    if 'isbn' in identifiers and identifiers['isbn']:
+        isbns = identifiers['isbn']
+        if isinstance(isbns, list) and len(isbns) > 0:
+            # Clean and validate ISBN
+            isbn = str(isbns[0]).strip().replace('-', '').replace(' ', '')
+            if len(isbn) in [10, 13]:
+                return isbn
+    
     return None
 
 
-def lookup_isbn_google_books(title: str, author: str) -> Optional[str]:
-    """Lookup ISBN using Google Books API."""
+def search_isbn_google_books(title: str, author: str) -> Optional[str]:
+    """Search for ISBN using Google Books API."""
+    if not title:
+        return None
+    
     try:
-        query = f"{title} {author}".strip()
+        query = f"{title}"
+        if author:
+            query += f" {author}"
+        
         url = "https://www.googleapis.com/books/v1/volumes"
-        params = {'q': query, 'maxResults': 1}
+        params = {
+            'q': query,
+            'maxResults': 1
+        }
         
         if GOOGLE_BOOKS_API_KEY:
             params['key'] = GOOGLE_BOOKS_API_KEY
@@ -143,21 +208,38 @@ def lookup_isbn_google_books(title: str, author: str) -> Optional[str]:
                 volume_info = data['items'][0].get('volumeInfo', {})
                 identifiers = volume_info.get('industryIdentifiers', [])
                 
+                # Prefer ISBN_13, fallback to ISBN_10
                 for identifier in identifiers:
-                    if identifier.get('type') in ['ISBN_13', 'ISBN_10']:
+                    if identifier.get('type') == 'ISBN_13':
                         return identifier.get('identifier')
+                
+                for identifier in identifiers:
+                    if identifier.get('type') == 'ISBN_10':
+                        return identifier.get('identifier')
+        
+        time.sleep(API_DELAY)
+        
     except Exception as e:
-        pass
+        print(f"    ⚠️  Google Books API error: {e}")
     
     return None
 
 
-def lookup_isbn_openlibrary(title: str, author: str) -> Optional[str]:
-    """Lookup ISBN using Open Library API."""
+def search_isbn_open_library(title: str, author: str) -> Optional[str]:
+    """Search for ISBN using Open Library API."""
+    if not title:
+        return None
+    
     try:
-        query = f"{title} {author}".strip()
-        url = f"https://openlibrary.org/search.json"
-        params = {'q': query, 'limit': 1}
+        query = title
+        if author:
+            query += f" {author}"
+        
+        url = "https://openlibrary.org/search.json"
+        params = {
+            'q': query,
+            'limit': 1
+        }
         
         response = requests.get(url, params=params, timeout=5)
         
@@ -165,380 +247,568 @@ def lookup_isbn_openlibrary(title: str, author: str) -> Optional[str]:
             data = response.json()
             if 'docs' in data and len(data['docs']) > 0:
                 doc = data['docs'][0]
-                isbn_list = doc.get('isbn', [])
-                if isbn_list:
-                    return isbn_list[0]
+                
+                # Try ISBN_13 first
+                if 'isbn' in doc and doc['isbn']:
+                    for isbn in doc['isbn']:
+                        isbn_clean = str(isbn).strip().replace('-', '')
+                        if len(isbn_clean) == 13:
+                            return isbn_clean
+                    
+                    # Fallback to any ISBN
+                    return str(doc['isbn'][0]).strip().replace('-', '')
+        
+        time.sleep(API_DELAY)
+        
     except Exception as e:
-        pass
+        print(f"    ⚠️  Open Library API error: {e}")
     
     return None
 
 
-def get_isbn_for_book(title: str, author: str, identifiers: Dict) -> Optional[str]:
-    """
-    Get ISBN for a book using multiple strategies:
-    1. Extract from dataset identifiers
-    2. Google Books API lookup
-    3. Open Library API lookup
-    """
-    # Strategy 1: Extract from dataset
-    isbn = extract_isbn_from_identifiers(identifiers)
-    if isbn:
-        return isbn
-    
-    # Strategy 2: Google Books API
-    time.sleep(API_DELAY)
-    isbn = lookup_isbn_google_books(title, author)
-    if isbn:
-        return isbn
-    
-    # Strategy 3: Open Library API
-    time.sleep(API_DELAY)
-    isbn = lookup_isbn_openlibrary(title, author)
-    if isbn:
-        return isbn
-    
-    return None
+def generate_isbn_from_barcode(barcode: str) -> str:
+    """Generate a pseudo-ISBN from barcode for books without ISBN."""
+    # Use barcode hash to create a unique 13-digit identifier
+    # Prefix with 999 to indicate it's not a real ISBN
+    barcode_hash = abs(hash(barcode)) % (10 ** 10)
+    return f"999{barcode_hash:010d}"
 
 
-def get_cover_image_url(title: str, author: str, isbn: Optional[str]) -> str:
-    """
-    Get book cover image URL using multiple sources:
-    1. Open Library Covers API (if ISBN available)
-    2. Google Books API
-    3. Placeholder fallback
-    """
-    # Strategy 1: Open Library Covers (best quality if ISBN available)
+def get_isbn_for_book(book_data: Dict) -> str:
+    """Get or generate ISBN for a book."""
+    # 1. Try to extract from identifiers
+    isbn = extract_isbn_from_identifiers(book_data.get('identifiers_src'))
     if isbn:
-        # Try ISBN-13 first, then ISBN-10
-        cover_url = f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg"
-        try:
-            response = requests.head(cover_url, timeout=3)
-            if response.status_code == 200:
-                return cover_url
-        except:
-            pass
+        return isbn
     
-    # Strategy 2: Open Library Search
+    # 2. Try Google Books API
+    title = book_data.get('title_src', '')
+    author = book_data.get('author_src', '')
+    
+    isbn = search_isbn_google_books(title, author)
+    if isbn:
+        return isbn
+    
+    # 3. Try Open Library API
+    isbn = search_isbn_open_library(title, author)
+    if isbn:
+        return isbn
+    
+    # 4. Generate from barcode as last resort
+    barcode = book_data.get('barcode_src', '')
+    return generate_isbn_from_barcode(barcode)
+
+
+def fetch_cover_image(isbn: str, title: str = "") -> Optional[str]:
+    """Fetch cover image URL from multiple sources."""
+    # Try Open Library Covers API
     try:
-        query = f"{title} {author}".strip()
-        url = f"https://openlibrary.org/search.json"
-        params = {'q': query, 'limit': 1}
-        
-        response = requests.get(url, params=params, timeout=5)
-        
+        url = f"https://covers.openlibrary.org/b/isbn/{isbn}-L.jpg"
+        response = requests.head(url, timeout=3)
         if response.status_code == 200:
-            data = response.json()
-            if 'docs' in data and len(data['docs']) > 0:
-                doc = data['docs'][0]
-                if 'cover_i' in doc:
-                    cover_id = doc['cover_i']
-                    return f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg"
+            return url
     except:
         pass
     
-    # Strategy 3: Placeholder
-    title_short = title[:30].replace(' ', '+')
-    return f"https://via.placeholder.com/400x600/4A5568/FFFFFF?text={title_short}"
+    # Try Google Books API
+    if GOOGLE_BOOKS_API_KEY:
+        try:
+            url = "https://www.googleapis.com/books/v1/volumes"
+            params = {
+                'q': f'isbn:{isbn}',
+                'key': GOOGLE_BOOKS_API_KEY
+            }
+            response = requests.get(url, params=params, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if 'items' in data and len(data['items']) > 0:
+                    image_links = data['items'][0].get('volumeInfo', {}).get('imageLinks', {})
+                    if 'thumbnail' in image_links:
+                        return image_links['thumbnail']
+        except:
+            pass
+    
+    return None
 
 
-def infer_genres(title: str, author: str, subject: str, genre: str) -> List[str]:
-    """Infer genres based on title, author, subject, and genre fields."""
-    GENRE_KEYWORDS = {
-        'Fiction': ['novel', 'story', 'fiction', 'tale', 'narrative'],
-        'Science': ['science', 'physics', 'chemistry', 'biology', 'mathematics', 'astronomy'],
-        'History': ['history', 'historical', 'war', 'ancient', 'medieval'],
-        'Philosophy': ['philosophy', 'philosophical', 'ethics', 'logic', 'metaphysics'],
-        'Poetry': ['poetry', 'poems', 'verse', 'sonnet'],
-        'Drama': ['drama', 'play', 'theatre', 'tragedy', 'comedy'],
-        'Biography': ['biography', 'autobiography', 'memoir', 'life'],
-        'Religion': ['religion', 'religious', 'theology', 'spiritual', 'bible', 'god'],
-        'Travel': ['travel', 'journey', 'voyage', 'adventure', 'exploration'],
-        'Art': ['art', 'painting', 'sculpture', 'architecture', 'music'],
+def parse_publication_date(date_str: str) -> Optional[str]:
+    """Parse publication date to YYYY-MM-DD format."""
+    if not date_str:
+        return None
+    
+    # Try to extract year
+    year_match = re.search(r'\b(1[0-9]{3}|20[0-9]{2})\b', str(date_str))
+    if year_match:
+        year = year_match.group(1)
+        return f"{year}-01-01"
+    
+    return None
+
+
+def clean_text(text: str, max_length: int = 5000) -> str:
+    """Clean and truncate text."""
+    if not text:
+        return ""
+    
+    # Remove excessive whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # Truncate if too long
+    if len(text) > max_length:
+        text = text[:max_length] + "..."
+    
+    return text
+
+
+def extract_language(book_data: Dict) -> str:
+    """Extract language from book data."""
+    # Prefer generated language
+    lang = book_data.get('language_gen', '')
+    if not lang:
+        lang = book_data.get('language_src', '')
+    
+    # Map to common language codes
+    lang_map = {
+        'eng': 'English',
+        'fra': 'French',
+        'deu': 'German',
+        'spa': 'Spanish',
+        'ita': 'Italian',
+        'por': 'Portuguese',
+        'rus': 'Russian',
+        'jpn': 'Japanese',
+        'chi': 'Chinese',
+        'ara': 'Arabic'
     }
     
-    text = f"{title} {author} {subject} {genre}".lower()
-    matched_genres = []
-    
-    for genre_name, keywords in GENRE_KEYWORDS.items():
-        if any(keyword in text for keyword in keywords):
-            matched_genres.append(genre_name)
-    
-    # Default if none matched
-    if not matched_genres:
-        matched_genres = ['Literature']
-    
-    return matched_genres[:2]  # Max 2 genres
+    return lang_map.get(lang[:3].lower(), lang or 'English')
 
 
-def generate_description(title: str, author: str, subject: str, page_count: int) -> str:
-    """Generate a book description from available metadata."""
-    if subject and subject.strip():
-        return f"'{title}' by {author} is a {page_count}-page work exploring {subject.lower()}."
-    else:
-        return f"'{title}' by {author} is a {page_count}-page literary work."
-
-
-def generate_reviews(book_title: str, num_reviews: int = 3) -> List[Dict]:
-    """Generate sample reviews for a book."""
-    reviews = []
-    review_templates = [
-        "An excellent read that provides great insights.",
-        "A classic work that stands the test of time.",
-        "Highly recommended for anyone interested in the subject.",
-        "A comprehensive and well-written book.",
-        "An important contribution to the field."
-    ]
+def extract_genres(book_data: Dict) -> List[str]:
+    """Extract genres from book data."""
+    genres = []
     
-    for _ in range(num_reviews):
-        rating = random.randint(3, 5)
-        review_text = random.choice(review_templates)
-        created_at = datetime.now() - timedelta(days=random.randint(1, 365))
+    # From genre_or_form_src
+    genre_str = book_data.get('genre_or_form_src', '')
+    if genre_str:
+        # Split by common delimiters
+        parts = re.split(r'[;,|]', genre_str)
+        genres.extend([g.strip() for g in parts if g.strip()])
+    
+    # From topic_or_subject
+    topic = book_data.get('topic_or_subject_gen') or book_data.get('topic_or_subject_src', '')
+    if topic and topic not in genres:
+        genres.append(topic)
+    
+    # Default genre if none found
+    if not genres:
+        genres = ['General']
+    
+    return genres[:3]  # Limit to 3 genres
+
+
+def extract_description(book_data: Dict) -> str:
+    """Extract or generate description from book data."""
+    # Try general notes
+    desc = book_data.get('general_note_src', '')
+    
+    # If no description, create one from available data
+    if not desc:
+        parts = []
         
-        reviews.append({
-            'rating': rating,
-            'review_text': review_text,
-            'created_at': created_at
-        })
+        topic = book_data.get('topic_or_subject_gen') or book_data.get('topic_or_subject_src')
+        if topic:
+            parts.append(f"Subject: {topic}")
+        
+        lang = book_data.get('language_gen', '')
+        if lang:
+            parts.append(f"Language: {lang}")
+        
+        pages = book_data.get('page_count_src')
+        if pages:
+            parts.append(f"{pages} pages")
+        
+        desc = ". ".join(parts) if parts else "No description available"
     
-    return reviews
+    return clean_text(desc, 2000)
 
 
 # ============================================================================
-# DATA LOADING FUNCTIONS
+# DATABASE OPERATIONS
 # ============================================================================
 
-def process_book_chunk(chunk: List[Dict], demo_user_id: int, conn, cur, 
-                       genre_cache: Dict, author_cache: Dict) -> int:
-    """Process a chunk of books and load to database."""
-    loaded_count = 0
+def get_db_connection():
+    """Create database connection."""
+    return psycopg2.connect(**DB_CONFIG)
+
+
+def get_or_create_author(cursor, author_name: str) -> int:
+    """Get or create author and return ID."""
+    if not author_name or author_name.strip() == '':
+        author_name = "Unknown Author"
     
-    for i, book in enumerate(chunk):
+    # Split name into first and last
+    parts = author_name.strip().split()
+    if len(parts) >= 2:
+        prenom = ' '.join(parts[:-1])
+        nom = parts[-1]
+    else:
+        prenom = ""
+        nom = author_name.strip()
+    
+    # Check if author exists
+    cursor.execute(
+        "SELECT id FROM authors WHERE nom = %s AND prenom = %s",
+        (nom, prenom)
+    )
+    result = cursor.fetchone()
+    
+    if result:
+        return result[0]
+    
+    # Create new author
+    cursor.execute(
+        """
+        INSERT INTO authors (nom, prenom, created_at)
+        VALUES (%s, %s, NOW())
+        RETURNING id
+        """,
+        (nom, prenom)
+    )
+    return cursor.fetchone()[0]
+
+
+def get_or_create_genre(cursor, genre_name: str) -> int:
+    """Get or create genre and return ID."""
+    if not genre_name or genre_name.strip() == '':
+        genre_name = "General"
+    
+    genre_name = genre_name.strip()
+    
+    # Check if genre exists
+    cursor.execute(
+        "SELECT id FROM genres WHERE nom = %s",
+        (genre_name,)
+    )
+    result = cursor.fetchone()
+    
+    if result:
+        return result[0]
+    
+    # Create new genre
+    cursor.execute(
+        """
+        INSERT INTO genres (nom, created_at)
+        VALUES (%s, NOW())
+        RETURNING id
+        """,
+        (genre_name,)
+    )
+    return cursor.fetchone()[0]
+
+
+def insert_book_batch(cursor, books_data: List[Dict]) -> Tuple[int, int]:
+    """Insert a batch of books into database."""
+    inserted = 0
+    skipped = 0
+    
+    for book_data in books_data:
         try:
-            # Extract basic info
-            title = book.get('title_src', f'Unknown Title')
-            author = book.get('author_src', 'Unknown Author')
+            # Get or generate ISBN
+            isbn = get_isbn_for_book(book_data)
             
-            if not title or not author:
+            # Check if book already exists
+            cursor.execute("SELECT id FROM books WHERE isbn = %s", (isbn,))
+            if cursor.fetchone():
+                skipped += 1
                 continue
             
-            # Clean author name
-            if not author or author.strip() == '':
-                author = 'Anonymous'
+            # Extract book information
+            title = book_data.get('title_src', 'Unknown Title')
+            author_name = book_data.get('author_src', 'Unknown Author')
+            pub_date = parse_publication_date(book_data.get('date1_src', ''))
+            description = extract_description(book_data)
+            page_count = book_data.get('page_count_src')
+            language = extract_language(book_data)
+            genres = extract_genres(book_data)
             
-            # Extract identifiers
-            identifiers = book.get('identifiers_src', {})
+            # Fetch cover image
+            cover_url = fetch_cover_image(isbn, title)
             
-            # Get ISBN (with API lookups)
-            isbn = get_isbn_for_book(title, author, identifiers)
-            
-            # Get cover image
-            cover_url = get_cover_image_url(title, author, isbn)
-            
-            # Extract other metadata
-            date_pub = book.get('date1_src', '1900-01-01')
-            page_count = book.get('page_count_src', 0)
-            subject = book.get('topic_or_subject_src', '')
-            genre_src = book.get('genre_or_form_src', '')
-            
-            # Infer genres
-            genres = infer_genres(title, author, subject, genre_src)
-            
-            # Generate description
-            description = generate_description(title, author, subject, page_count)
-            
-            # Generate reviews
-            reviews = generate_reviews(title, num_reviews=3)
+            # Get word count from token count (approximate)
+            token_count = book_data.get('token_count_o200k_base_gen', 0)
+            word_count = int(token_count * 0.75) if token_count else None
             
             # Insert book
-            cur.execute("""
-                INSERT INTO books (titre, isbn, date_publication, description, image_url)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (titre) DO NOTHING
+            cursor.execute(
+                """
+                INSERT INTO books (
+                    titre, isbn, date_publication, description, image_url,
+                    nombre_pages, total_pages, langue, note_moyenne, nombre_reviews,
+                    average_rating, review_count, word_count, created_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
                 RETURNING id
-            """, (title, isbn, date_pub, description, cover_url))
+                """,
+                (
+                    title, isbn, pub_date, description, cover_url,
+                    page_count, page_count, language, 0.0, 0,
+                    0.0, 0, word_count
+                )
+            )
+            book_id = cursor.fetchone()[0]
             
-            result = cur.fetchone()
-            if not result:
-                continue  # Book already exists
-            
-            book_id = result[0]
-            
-            # Insert or get author
-            if author not in author_cache:
-                cur.execute("""
-                    INSERT INTO authors (nom, prenom)
-                    VALUES (%s, %s)
-                    ON CONFLICT (nom, prenom) DO UPDATE SET nom = EXCLUDED.nom
-                    RETURNING id
-                """, (author, ''))
-                author_cache[author] = cur.fetchone()[0]
-            
-            author_id = author_cache[author]
+            # Create or get author
+            author_id = get_or_create_author(cursor, author_name)
             
             # Link book to author
-            cur.execute("""
+            cursor.execute(
+                """
                 INSERT INTO book_authors (book_id, author_id)
                 VALUES (%s, %s)
                 ON CONFLICT DO NOTHING
-            """, (book_id, author_id))
+                """,
+                (book_id, author_id)
+            )
             
-            # Insert genres and link to book
+            # Link book to genres
             for genre_name in genres:
-                if genre_name not in genre_cache:
-                    cur.execute("""
-                        INSERT INTO genres (nom)
-                        VALUES (%s)
-                        ON CONFLICT (nom) DO UPDATE SET nom = EXCLUDED.nom
-                        RETURNING id
-                    """, (genre_name,))
-                    genre_cache[genre_name] = cur.fetchone()[0]
-                
-                genre_id = genre_cache[genre_name]
-                
-                cur.execute("""
+                genre_id = get_or_create_genre(cursor, genre_name)
+                cursor.execute(
+                    """
                     INSERT INTO book_genres (book_id, genre_id)
                     VALUES (%s, %s)
                     ON CONFLICT DO NOTHING
-                """, (book_id, genre_id))
+                    """,
+                    (book_id, genre_id)
+                )
             
-            # Insert reviews
-            for review in reviews:
-                cur.execute("""
-                    INSERT INTO reviews (book_id, user_id, rating, review_text, created_at)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (
-                    book_id,
-                    demo_user_id,
-                    review['rating'],
-                    review['review_text'],
-                    review['created_at']
-                ))
+            # Update denormalized fields
+            cursor.execute(
+                """
+                UPDATE books
+                SET author_names = ARRAY[%s],
+                    genre_names = %s
+                WHERE id = %s
+                """,
+                (author_name, genres, book_id)
+            )
             
-            loaded_count += 1
+            inserted += 1
             
         except Exception as e:
-            print(f"  ⚠️  Error loading book '{book.get('title_src', 'Unknown')}': {e}")
-            conn.rollback()
+            print(f"    ❌ Error inserting book: {e}")
+            skipped += 1
             continue
     
-    conn.commit()
-    return loaded_count
+    return inserted, skipped
 
 
-def main():
-    """Main execution function."""
-    print("=" * 80)
-    print("📥 LOADING INSTITUTIONAL BOOKS DATASET")
-    print("=" * 80 + "\n")
+# ============================================================================
+# MAIN LOADING FUNCTION
+# ============================================================================
+
+def load_institutional_books(max_chunks: Optional[int] = None, resume: bool = True):
+    """Load books from institutional dataset."""
+    print_header()
+    print_dataset_info()
     
-    # Load dataset in streaming mode
-    print(f"📥 Loading dataset stream: {DATASET_NAME}...\n")
-    dataset_stream = load_dataset(DATASET_NAME, split="train", streaming=True)
+    # Login to HuggingFace
+    print("🔐 Authenticating with HuggingFace...")
+    try:
+        login(token=HF_TOKEN)
+        print("✅ Successfully authenticated\n")
+    except Exception as e:
+        print(f"⚠️  Authentication warning: {e}\n")
+    
+    # Load progress
+    progress = load_progress() if resume else {'last_processed_index': -1, 'total_loaded': 0}
+    start_index = progress['last_processed_index'] + 1
+    
+    if resume and start_index > 0:
+        print(f"📍 Resuming from index {start_index} ({progress['total_loaded']} books loaded)")
+        print(f"   Last processed: {progress.get('last_barcode', 'N/A')}")
+        print(f"   Timestamp: {progress.get('timestamp', 'N/A')}\n")
+    
+    # Load dataset with streaming
+    print(f"📥 Loading dataset: {DATASET_NAME}")
+    print("   Using streaming mode for memory efficiency...\n")
+    
+    try:
+        dataset_stream = load_dataset(DATASET_NAME, split="train", streaming=True)
+    except Exception as e:
+        print(f"❌ Failed to load dataset: {e}")
+        return
     
     # Connect to database
     print("🔌 Connecting to database...")
-    conn = psycopg2.connect(**DB_CONFIG)
-    cur = conn.cursor()
-    print("✅ Connected to PostgreSQL database\n")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        print("✅ Database connected\n")
+    except Exception as e:
+        print(f"❌ Database connection failed: {e}")
+        return
     
-    # Create demo user
-    cur.execute("""
-        INSERT INTO users (email, password_hash, first_name, last_name, is_admin)
-        VALUES ('demo@booklook.com', 'hashed_password', 'Demo', 'User', false)
-        ON CONFLICT (email) DO NOTHING
-        RETURNING id
-    """)
-    result = cur.fetchone()
-    if result:
-        demo_user_id = result[0]
-    else:
-        cur.execute("SELECT id FROM users WHERE email = 'demo@booklook.com'")
-        demo_user_id = cur.fetchone()[0]
+    # Process dataset in chunks
+    print(f"🚀 Starting data loading (chunk size: {CHUNK_SIZE})")
+    print("=" * 80)
     
-    conn.commit()
-    print(f"👤 Demo user ID: {demo_user_id}\n")
+    chunk_buffer = []
+    current_index = 0
+    chunk_number = 0
+    total_inserted = progress['total_loaded']
+    total_skipped = 0
+    start_time = time.time()
     
-    # Initialize caches
-    genre_cache = {}
-    author_cache = {}
-    
-    # Process in chunks
-    total_loaded = 0
-    chunk_num = 0
-    chunk = []
-    
-    print(f"📦 Processing books in chunks of {CHUNK_SIZE}...\n")
-    
-    for book in dataset_stream:
-        chunk.append(book)
+    try:
+        for book_data in dataset_stream:
+            # Skip already processed books
+            if current_index < start_index:
+                current_index += 1
+                continue
+            
+            # Add to buffer
+            chunk_buffer.append(book_data)
+            current_index += 1
+            
+            # Process chunk when buffer is full
+            if len(chunk_buffer) >= CHUNK_SIZE:
+                chunk_number += 1
+                
+                print(f"\n📦 Processing Chunk {chunk_number} (books {current_index - CHUNK_SIZE + 1}-{current_index})")
+                print("-" * 80)
+                
+                # Insert batch
+                inserted, skipped = insert_book_batch(cursor, chunk_buffer)
+                conn.commit()
+                
+                total_inserted += inserted
+                total_skipped += skipped
+                
+                # Save progress
+                last_barcode = chunk_buffer[-1].get('barcode_src', 'unknown')
+                save_progress(current_index - 1, total_inserted, last_barcode)
+                
+                # Print stats
+                elapsed = time.time() - start_time
+                rate = total_inserted / elapsed if elapsed > 0 else 0
+                
+                print(f"   ✅ Inserted: {inserted}")
+                print(f"   ⏭️  Skipped: {skipped}")
+                print(f"   📊 Total: {total_inserted} books loaded, {total_skipped} skipped")
+                print(f"   ⏱️  Rate: {rate:.1f} books/second")
+                print(f"   💾 Progress saved")
+                
+                # Clear buffer
+                chunk_buffer = []
+                
+                # Check if we've reached max chunks
+                if max_chunks and chunk_number >= max_chunks:
+                    print(f"\n🏁 Reached maximum chunks limit ({max_chunks})")
+                    break
         
-        if len(chunk) >= CHUNK_SIZE:
-            chunk_num += 1
-            print(f"📚 Processing chunk {chunk_num} ({len(chunk)} books)...")
+        # Process remaining books in buffer
+        if chunk_buffer:
+            chunk_number += 1
+            print(f"\n📦 Processing Final Chunk {chunk_number} ({len(chunk_buffer)} books)")
+            print("-" * 80)
             
-            loaded = process_book_chunk(chunk, demo_user_id, conn, cur, genre_cache, author_cache)
-            total_loaded += loaded
+            inserted, skipped = insert_book_batch(cursor, chunk_buffer)
+            conn.commit()
             
-            print(f"   ✅ Loaded {loaded} books (Total: {total_loaded})\n")
+            total_inserted += inserted
+            total_skipped += skipped
             
-            chunk = []
+            last_barcode = chunk_buffer[-1].get('barcode_src', 'unknown')
+            save_progress(current_index - 1, total_inserted, last_barcode)
             
-            # Check if we've reached max chunks
-            if MAX_CHUNKS and chunk_num >= MAX_CHUNKS:
-                print(f"🛑 Reached maximum chunks limit ({MAX_CHUNKS})\n")
-                break
+            print(f"   ✅ Inserted: {inserted}")
+            print(f"   ⏭️  Skipped: {skipped}")
+        
+        # Final summary
+        elapsed = time.time() - start_time
+        print("\n" + "=" * 80)
+        print("✅ LOADING COMPLETE")
+        print("=" * 80)
+        print(f"📊 Total books inserted: {total_inserted}")
+        print(f"⏭️  Total books skipped: {total_skipped}")
+        print(f"📦 Total chunks processed: {chunk_number}")
+        print(f"⏱️  Total time: {elapsed:.1f} seconds")
+        print(f"📈 Average rate: {total_inserted / elapsed:.1f} books/second")
+        print("=" * 80)
+        
+    except KeyboardInterrupt:
+        print("\n\n⚠️  Loading interrupted by user")
+        print(f"💾 Progress saved at index {current_index - 1}")
+        print(f"📊 Loaded {total_inserted} books so far")
+        print("   Run with --resume to continue from this point")
+        conn.commit()
     
-    # Process remaining books
-    if chunk:
-        chunk_num += 1
-        print(f"📚 Processing final chunk {chunk_num} ({len(chunk)} books)...")
-        loaded = process_book_chunk(chunk, demo_user_id, conn, cur, genre_cache, author_cache)
-        total_loaded += loaded
-        print(f"   ✅ Loaded {loaded} books (Total: {total_loaded})\n")
+    except Exception as e:
+        print(f"\n❌ Error during loading: {e}")
+        import traceback
+        traceback.print_exc()
+        conn.rollback()
     
-    # Verification
-    print("=" * 80)
-    print("🔍 VERIFICATION")
-    print("=" * 80 + "\n")
+    finally:
+        cursor.close()
+        conn.close()
+        print("\n🔌 Database connection closed")
+
+
+# ============================================================================
+# COMMAND LINE INTERFACE
+# ============================================================================
+
+def main():
+    """Main entry point."""
+    parser = argparse.ArgumentParser(
+        description='Load Institutional Books dataset into BookLook database',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Load first 1000 books (10 chunks)
+  python load_institutional_books.py --max-chunks 10
+  
+  # Load all books
+  python load_institutional_books.py
+  
+  # Resume from last position
+  python load_institutional_books.py --resume
+  
+  # Start fresh (ignore progress)
+  python load_institutional_books.py --no-resume
+        """
+    )
     
-    cur.execute("SELECT COUNT(*) FROM books")
-    book_count = cur.fetchone()[0]
-    print(f"📚 Total books in database: {book_count}")
+    parser.add_argument(
+        '--max-chunks',
+        type=int,
+        default=None,
+        help='Maximum number of chunks to process (default: all)'
+    )
     
-    cur.execute("SELECT COUNT(*) FROM authors")
-    author_count = cur.fetchone()[0]
-    print(f"✍️  Total authors: {author_count}")
+    parser.add_argument(
+        '--resume',
+        action='store_true',
+        default=True,
+        help='Resume from last saved position (default: True)'
+    )
     
-    cur.execute("SELECT COUNT(*) FROM genres")
-    genre_count = cur.fetchone()[0]
-    print(f"🏷️  Total genres: {genre_count}")
+    parser.add_argument(
+        '--no-resume',
+        action='store_false',
+        dest='resume',
+        help='Start from beginning, ignore saved progress'
+    )
     
-    cur.execute("SELECT COUNT(*) FROM reviews")
-    review_count = cur.fetchone()[0]
-    print(f"⭐ Total reviews: {review_count}")
+    args = parser.parse_args()
     
-    # Sample books with covers
-    cur.execute("""
-        SELECT titre, isbn, image_url 
-        FROM books 
-        WHERE image_url IS NOT NULL 
-        ORDER BY id DESC
-        LIMIT 5
-    """)
-    print("\n📸 Sample recently loaded books:")
-    for title, isbn, url in cur.fetchall():
-        isbn_display = isbn if isbn else "No ISBN"
-        print(f"  • {title[:60]}...")
-        print(f"    ISBN: {isbn_display}")
-        print(f"    Cover: {url[:80]}...")
-    
-    # Cleanup
-    cur.close()
-    conn.close()
-    print("\n✅ Database connection closed")
-    print("\n🎉 All done! Your database is now populated with enriched book data!")
-    print("=" * 80)
+    load_institutional_books(
+        max_chunks=args.max_chunks,
+        resume=args.resume
+    )
 
 
 if __name__ == "__main__":
