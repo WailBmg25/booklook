@@ -39,9 +39,9 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy application code
 COPY main.py .
 COPY src/ ./src/
-COPY load_institutional_dataset.py .
 COPY add_sample_data.py .
 COPY add_sample_book_content.py .
+COPY clean_books_database.py .
 
 # Create directories for logs and data
 RUN mkdir -p /app/logs /app/data
