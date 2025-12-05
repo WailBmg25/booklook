@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { favoritesApi } from "@/lib/api/favorites";
+import BookCover from "./book-cover";
 
 interface BooksTableProps {
   books: Book[];
@@ -121,10 +122,13 @@ export default function BooksTable({
           className="block bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
         >
           <div className="flex gap-4">
-            {/* Book Cover Placeholder */}
-            <div className="flex-shrink-0 w-16 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded flex items-center justify-center">
-              <BookOpen className="h-8 w-8 text-white" />
-            </div>
+            {/* Book Cover */}
+            <BookCover
+              imageUrl={book.image_url}
+              title={book.titre}
+              size="small"
+              className="flex-shrink-0"
+            />
 
             {/* Book Info */}
             <div className="flex-1 min-w-0 flex justify-between items-start gap-4">

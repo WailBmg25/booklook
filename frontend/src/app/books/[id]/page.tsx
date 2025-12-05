@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/navbar";
 import ReviewSection from "@/components/books/review-section";
+import BookCover from "@/components/books/book-cover";
 import { booksApi } from "@/lib/api/books";
 import { reviewsApi } from "@/lib/api/reviews";
 import { favoritesApi } from "@/lib/api/favorites";
@@ -159,9 +160,11 @@ export default function BookDetailsPage() {
         <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
           <div className="flex gap-6">
             {/* Book Cover */}
-            <div className="flex-shrink-0 w-32 h-48 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <BookOpen className="h-16 w-16 text-white" />
-            </div>
+            <BookCover
+              imageUrl={book.image_url}
+              title={book.titre}
+              size="medium"
+            />
 
             {/* Book Info */}
             <div className="flex-1">
