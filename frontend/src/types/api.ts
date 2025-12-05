@@ -19,6 +19,7 @@ export interface Book {
   id: number;
   titre: string;
   isbn?: string;
+  image_url?: string;
   auteur?: string;
   author_names?: string[];
   genre_names?: string[];
