@@ -31,6 +31,7 @@ class BookResponse(BaseModel):
     id: int
     titre: str
     isbn: Optional[str] = None
+    image_url: Optional[str] = None
     author_names: Optional[List[str]] = []
     genre_names: Optional[List[str]] = []
     date_publication: Optional[str] = None  # Changed from int to str to handle date objects
@@ -50,6 +51,7 @@ class BookDetailResponse(BaseModel):
     id: int
     titre: str
     isbn: Optional[str] = None
+    image_url: Optional[str] = None
     author_names: Optional[List[str]] = []
     genre_names: Optional[List[str]] = []
     date_publication: Optional[str] = None  # Changed from int to str to handle date objects
